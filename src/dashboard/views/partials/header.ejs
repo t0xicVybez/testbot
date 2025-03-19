@@ -43,6 +43,15 @@
                         <a href="/dashboard" class="text-gray-300 hover:text-white transition-colors">
                             <i class="fas fa-tachometer-alt mr-1"></i> Dashboard
                         </a>
+                        <% if (typeof guild !== 'undefined' && guild) { %>
+                            <a href="/analytics/<%= guild.id %>" class="text-gray-300 hover:text-white transition-colors">
+                                <i class="fas fa-chart-bar mr-1"></i> Analytics
+                            </a>
+                        <% } else { %>
+                            <a href="/dashboard" class="text-gray-300 hover:text-white transition-colors">
+                                <i class="fas fa-chart-bar mr-1"></i> Analytics
+                            </a>
+                        <% } %>
                         <a href="/dashboard/plugins" class="text-gray-300 hover:text-white transition-colors">
                             <i class="fas fa-puzzle-piece mr-1"></i> Plugins
                         </a>
@@ -70,4 +79,4 @@
             </div>
         </div>
     </nav>
-    <main class="min-h-screen bg-gray-900"> 
+    <main class="min-h-screen bg-gray-900">

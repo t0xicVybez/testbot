@@ -1,0 +1,294 @@
+<%- include('../partials/header') %>
+
+<main class="container mx-auto px-4 py-8">
+    <div class="flex items-center justify-between mb-8">
+        <div>
+            <h1 class="text-3xl font-bold">Analytics & Insights</h1>
+            <p class="text-gray-400">Server: <%= guild.name %></p>
+        </div>
+        <div class="space-x-2">
+            <a href="/dashboard" class="text-gray-400 hover:text-white transition-colors">
+                <i class="fas fa-arrow-left mr-2"></i>
+                Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Time Range Filter -->
+    <div class="bg-gray-800 rounded-lg p-4 mb-6 flex items-center justify-between">
+        <div>
+            <span class="text-gray-300 mr-2">Time Range:</span>
+        </div>
+        <div class="flex space-x-2">
+            <a href="?timeRange=24h" class="px-3 py-1 rounded-md <%= timeRange === '24h' ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600' %> transition-colors">24 Hours</a>
+            <a href="?timeRange=7d" class="px-3 py-1 rounded-md <%= timeRange === '7d' ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600' %> transition-colors">7 Days</a>
+            <a href="?timeRange=30d" class="px-3 py-1 rounded-md <%= timeRange === '30d' ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600' %> transition-colors">30 Days</a>
+            <a href="?timeRange=all" class="px-3 py-1 rounded-md <%= timeRange === 'all' ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600' %> transition-colors">All Time</a>
+        </div>
+    </div>
+
+    <!-- Overview Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-gray-800 rounded-lg p-6 flex flex-col items-center justify-center text-center">
+            <div class="text-4xl font-bold text-blue-400 mb-2"><%= serverStats.totalEvents.toLocaleString() %></div>
+            <div class="text-gray-300">Total Events</div>
+        </div>
+        <div class="bg-gray-800 rounded-lg p-6 flex flex-col items-center justify-center text-center">
+            <div class="text-4xl font-bold text-green-400 mb-2"><%= serverStats.commandsUsed.toLocaleString() %></div>
+            <div class="text-gray-300">Commands Used</div>
+        </div>
+        <div class="bg-gray-800 rounded-lg p-6 flex flex-col items-center justify-center text-center">
+            <div class="text-4xl font-bold text-purple-400 mb-2"><%= serverStats.uniqueUsers.toLocaleString() %></div>
+            <div class="text-gray-300">Active Users</div>
+        </div>
+        <div class="bg-gray-800 rounded-lg p-6 flex flex-col items-center justify-center text-center">
+            <div class="text-4xl font-bold text-yellow-400 mb-2"><%= serverStats.mostActiveDay.count.toLocaleString() %></div>
+            <div class="text-gray-300">Peak Day Activity</div>
+            <div class="text-sm text-gray-400"><%= new Date(serverStats.mostActiveDay.date).toLocaleDateString() %></div>
+        </div>
+    </div>
+
+    <!-- Activity Chart -->
+    <div class="bg-gray-800 rounded-lg p-6 mb-6">
+        <h2 class="text-xl font-semibold mb-4">Server Activity</h2>
+        <div class="w-full h-80">
+            <canvas id="activityChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Flex Container for Command Stats and Member Activity -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <!-- Command Usage -->
+        <div class="bg-gray-800 rounded-lg p-6">
+            <h2 class="text-xl font-semibold mb-4">Command Usage</h2>
+            <div id="commandStats" class="max-h-96 overflow-y-auto">
+                <div class="text-center text-gray-400 py-4">
+                    <i class="fas fa-spinner fa-spin text-2xl"></i>
+                    <p class="mt-2">Loading command statistics...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Member Activity -->
+        <div class="bg-gray-800 rounded-lg p-6">
+            <h2 class="text-xl font-semibold mb-4">Most Active Members</h2>
+            <div id="memberActivity" class="max-h-96 overflow-y-auto">
+                <div class="text-center text-gray-400 py-4">
+                    <i class="fas fa-spinner fa-spin text-2xl"></i>
+                    <p class="mt-2">Loading member activity...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<!-- Include Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const guildId = '<%= guild.id %>';
+        const timeRange = '<%= timeRange %>';
+        const csrfToken = '<%= csrfToken %>';
+        
+        // Fetch daily activity data for the chart
+        fetchDailyActivity();
+        
+        // Fetch command stats
+        fetchCommandStats();
+        
+        // Fetch member activity
+        fetchMemberActivity();
+        
+        // Function to fetch daily activity data and create chart
+        async function fetchDailyActivity() {
+            try {
+                const response = await fetch(`/analytics/api/${guildId}/daily-activity?timeRange=${timeRange}`, {
+                    headers: {
+                        'CSRF-Token': csrfToken
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to fetch daily activity data');
+                }
+                
+                const activityData = await response.json();
+                createActivityChart(activityData);
+            } catch (error) {
+                console.error('Error fetching daily activity:', error);
+                document.getElementById('activityChart').innerHTML = 'Failed to load activity chart';
+            }
+        }
+        
+        // Function to create activity chart
+        function createActivityChart(data) {
+            const ctx = document.getElementById('activityChart').getContext('2d');
+            
+            // Assign colors for each event type
+            const colorMap = {
+                'message_sent': 'rgba(54, 162, 235, 0.7)',
+                'command_used': 'rgba(75, 192, 192, 0.7)',
+                'voice_joined': 'rgba(153, 102, 255, 0.7)',
+                // Add more event types and colors as needed
+            };
+            
+            // Set background colors for datasets
+            data.datasets.forEach(dataset => {
+                const eventType = dataset.label.toLowerCase().replace(' ', '_');
+                dataset.backgroundColor = colorMap[eventType] || 'rgba(255, 99, 132, 0.7)';
+                dataset.borderColor = dataset.backgroundColor.replace('0.7', '1');
+                dataset.borderWidth = 1;
+            });
+            
+            new Chart(ctx, {
+                type: 'bar',
+                data: data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            stacked: true,
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: '#d1d5db'
+                            }
+                        },
+                        y: {
+                            stacked: true,
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: '#d1d5db'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#d1d5db'
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.7)'
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Function to fetch command stats
+        async function fetchCommandStats() {
+            try {
+                const response = await fetch(`/analytics/api/${guildId}/command-stats?timeRange=${timeRange}`, {
+                    headers: {
+                        'CSRF-Token': csrfToken
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to fetch command stats');
+                }
+                
+                const commandStats = await response.json();
+                displayCommandStats(commandStats);
+            } catch (error) {
+                console.error('Error fetching command stats:', error);
+                document.getElementById('commandStats').innerHTML = '<p class="text-red-400">Failed to load command statistics</p>';
+            }
+        }
+        
+        // Function to display command stats
+        function displayCommandStats(stats) {
+            const container = document.getElementById('commandStats');
+            
+            if (stats.length === 0) {
+                container.innerHTML = '<p class="text-gray-400 text-center">No command usage data available yet.</p>';
+                return;
+            }
+            
+            // Get total commands used for percentage calculation
+            const totalCommands = stats.reduce((total, cmd) => total + cmd.count, 0);
+            
+            let html = '<div class="space-y-4">';
+            
+            stats.forEach(cmd => {
+                const percentage = ((cmd.count / totalCommands) * 100).toFixed(1);
+                
+                html += `
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="font-medium">/${cmd.command_name}</span>
+                        <span class="text-sm text-gray-400">${cmd.count} uses (${percentage}%)</span>
+                    </div>
+                    <div class="w-full bg-gray-700 rounded-full h-2.5">
+                        <div class="bg-blue-600 h-2.5 rounded-full" style="width: ${percentage}%"></div>
+                    </div>
+                </div>`;
+            });
+            
+            html += '</div>';
+            container.innerHTML = html;
+        }
+        
+        // Function to fetch member activity
+        async function fetchMemberActivity() {
+            try {
+                const response = await fetch(`/analytics/api/${guildId}/member-activity?timeRange=${timeRange}`, {
+                    headers: {
+                        'CSRF-Token': csrfToken
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to fetch member activity');
+                }
+                
+                const memberActivity = await response.json();
+                displayMemberActivity(memberActivity);
+            } catch (error) {
+                console.error('Error fetching member activity:', error);
+                document.getElementById('memberActivity').innerHTML = '<p class="text-red-400">Failed to load member activity</p>';
+            }
+        }
+        
+        // Function to display member activity
+        function displayMemberActivity(members) {
+            const container = document.getElementById('memberActivity');
+            
+            if (members.length === 0) {
+                container.innerHTML = '<p class="text-gray-400 text-center">No member activity data available yet.</p>';
+                return;
+            }
+            
+            let html = '<div class="space-y-4">';
+            
+            members.forEach((member, index) => {
+                html += `
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-white font-bold">
+                        ${index + 1}
+                    </div>
+                    <div class="ml-4 flex-grow">
+                        <div class="flex items-center">
+                            <span class="font-medium">${member.username || 'Unknown User'}</span>
+                            <span class="ml-auto text-gray-400">${member.activity_count} actions</span>
+                        </div>
+                        <div class="w-full bg-gray-700 rounded-full h-2.5 mt-1">
+                            <div class="bg-green-500 h-2.5 rounded-full" style="width: ${(member.activity_count / members[0].activity_count) * 100}%"></div>
+                        </div>
+                    </div>
+                </div>`;
+            });
+            
+            html += '</div>';
+            container.innerHTML = html;
+        }
+    });
+</script>
+
+<%- include('../partials/footer') %>

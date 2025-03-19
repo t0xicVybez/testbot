@@ -9,7 +9,8 @@
     "deploy": "node src/bot/deploy-commands.js",
     "setup-db": "node src/database/setup.js",
     "setup-plugins": "node src/database/setup-plugins.js",
-    "setup-tickets": "node src/database/setup-tickets.js"
+    "setup-tickets": "node src/database/setup-tickets.js",
+    "setup-analytics": "node src/database/setup-analytics.js"
   },
   "dependencies": {
     "csurf": "^1.11.0",

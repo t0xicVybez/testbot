@@ -1,5 +1,6 @@
 const { Guilds } = require('../../database/guilds');
 const { Tags } = require('../../database/tags');
+const { Analytics } = require('../../database/analytics');
 const logger = require('../../utils/logger');
 
 module.exports = {
@@ -12,11 +13,28 @@ module.exports = {
             // Only process messages in guilds
             if (!message.guild) return;
             
+            // Track message analytics
+            Analytics.trackEvent(message.guild.id, 'message_sent', {
+                userId: message.author.id,
+                channelId: message.channel.id,
+                messageId: message.id,
+                timestamp: new Date().toISOString()
+            }).catch(err => logger.warn('Failed to track message analytics:', err));
+            
             // Check for auto-response tags first
             try {
                 const response = await Tags.processMessage(message);
                 if (response) {
                     await message.channel.send(response);
+                    
+                    // Track tag trigger event
+                    Analytics.trackEvent(message.guild.id, 'tag_triggered', {
+                        userId: message.author.id,
+                        messageId: message.id,
+                        channelId: message.channel.id,
+                        timestamp: new Date().toISOString()
+                    }).catch(err => logger.warn('Failed to track tag analytics:', err));
+                    
                     // If we sent an auto-response, we still continue to process commands
                 }
             } catch (tagError) {
@@ -56,6 +74,17 @@ module.exports = {
                     allowedMentions: { repliedUser: false }
                 });
             }
+
+            // Track command usage for analytics
+            Analytics.trackEvent(message.guild.id, 'command_used', {
+                commandName: command.name,
+                commandType: 'PREFIX',
+                userId: message.author.id,
+                channelId: message.channel.id,
+                messageId: message.id,
+                args: args,
+                timestamp: new Date().toISOString()
+            }).catch(err => logger.warn('Failed to track command analytics:', err));
 
             try {
                 await command.executePrefix(message, args);
