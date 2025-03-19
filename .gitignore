@@ -4,3 +4,4 @@ logs/error.log
 logs/combined.log
 *.log
 *.log
+.env
