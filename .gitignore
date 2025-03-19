@@ -1,2 +1,5 @@
 /node_modules
 /sessions
+logs/error.log
+logs/combined.log
+*.log
