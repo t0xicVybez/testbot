@@ -140,9 +140,11 @@ async function startApp() {
     const apiRoutes = require('./dashboard/routes/api');
     const dashboardRoutes = require('./dashboard/routes/dashboard');
     const authRoutes = require('./dashboard/routes/auth');
+    const pluginsRoutes = require('./dashboard/routes/plugins');
 
     app.use('/api', apiRoutes);
     app.use('/dashboard', dashboardRoutes);
+    app.use('/dashboard/plugins', pluginsRoutes);
     app.use('/auth', authRoutes);
 
     // Error handler

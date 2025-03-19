@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto Responder Tags - Discord Bot</title>
+    <link href="/css/output.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex flex-col">
+    <%- include('../partials/header') %>
+
+    <main class="flex-grow container mx-auto px-4 py-8">
+        <div class="flex items-center justify-between mb-8">
+            <div>
+                <h1 class="text-3xl font-bold">Auto Responder Tags</h1>
+                <p class="text-gray-400">Server: <%= guild.name %></p>
+            </div>
+            <div class="space-x-2">
+                <a href="/dashboard/plugins" class="text-gray-400 hover:text-white transition-colors">
+                    <i class="fas fa-arrow-left mr-2"></i>
+                    Back to Plugins
+                </a>
+            </div>
+        </div>
+
+        <div class="bg-gray-800 rounded-lg p-6 mb-8">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-xl font-semibold">Plugin Status: 
+                        <span class="<%= isEnabled ? 'text-green-400' : 'text-red-400' %>">
+                            <%= isEnabled ? 'Enabled' : 'Disabled' %>
+                        </span>
+                    </h2>
+                    <p class="text-gray-300 mt-2">
+                        Auto Responder Tags allow you to set up automatic responses when messages match specific patterns.
+                    </p>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" 
+                        class="sr-only peer" 
+                        <%= isEnabled ? 'checked' : '' %>
+                        id="plugin-toggle"
+                        onchange="togglePlugin('<%= guild.id %>', 'tags', this.checked)">
+                    <div class="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+            </div>
+        </div>
+
+        <!-- Create New Tag Button -->
+        <div class="mb-6 flex justify-end">
+            <button onclick="showTagModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
+                <i class="fas fa-plus mr-2"></i>Create New Tag
+            </button>
+        </div>
+
+        <!-- Tags List -->
+        <div class="bg-gray-800 rounded-lg overflow-hidden">
+            <% if (tags && tags.length > 0) { %>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="bg-gray-700">
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Name</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Pattern</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Type</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-700">
+                            <% tags.forEach(tag => { %>
+                                <tr class="hover:bg-gray-700">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                        <%= tag.name %>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                        <code class="bg-gray-900 px-2 py-1 rounded"><%= tag.pattern %></code>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                        <span class="<%= tag.is_regex ? 'text-purple-400' : 'text-blue-400' %>">
+                                            <%= tag.is_regex ? 'Regex' : 'Wildcard' %>
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                        <span class="px-2 py-1 rounded-full text-xs font-medium
+                                            <%= tag.is_enabled ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' %>">
+                                            <%= tag.is_enabled ? 'Enabled' : 'Disabled' %>
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                        <div class="flex space-x-2">
+                                            <button onclick="showViewTagModal('<%= tag.name %>', `<%= tag.pattern %>`, `<%= tag.response.replace(/`/g, '\\`').replace(/'/g, "\\'").replace(/"/g, '\\"') %>`, <%= tag.is_regex %>, <%= tag.is_enabled %>)" 
+                                                   class="text-blue-400 hover:text-blue-300 transition-colors">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button onclick="showEditTagModal('<%= tag.name %>', `<%= tag.pattern %>`, `<%= tag.response.replace(/`/g, '\\`').replace(/'/g, "\\'").replace(/"/g, '\\"') %>`, <%= tag.is_regex %>, <%= tag.is_enabled %>)" 
+                                                   class="text-yellow-400 hover:text-yellow-300 transition-colors">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button onclick="confirmDeleteTag('<%= tag.name %>')" 
+                                                   class="text-red-400 hover:text-red-300 transition-colors">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            <% } else { %>
+                <div class="text-center py-12">
+                    <h3 class="text-xl font-semibold mb-2">No tags created yet</h3>
+                    <p class="text-gray-400 mb-4">Create your first auto-responder tag to get started.</p>
+                    <button onclick="showTagModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition-colors">
+                        <i class="fas fa-plus mr-2"></i>Create Tag
+                    </button>
+                </div>
+            <% } %>
+        </div>
+
+        <!-- Tips and Help Section -->
+        <div class="mt-8 bg-gray-800 rounded-lg p-6">
+            <h3 class="text-lg font-semibold mb-4">Tips for Using Auto Responder Tags</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <h4 class="font-medium mb-2">Wildcard Patterns</h4>
+                    <p class="text-gray-300 text-sm">Use <code class="bg-gray-700 px-1 rounded">*</code> as a wildcard to match any text.</p>
+                    <div class="mt-2 text-sm">
+                        <p class="text-gray-400">Example: <code class="bg-gray-700 px-1 rounded">hello *</code> will match "hello world", "hello there", etc.</p>
+                    </div>
+                </div>
+                <div>
+                    <h4 class="font-medium mb-2">Regex Patterns</h4>
+                    <p class="text-gray-300 text-sm">Use regular expressions for more complex pattern matching.</p>
+                    <div class="mt-2 text-sm">
+                        <p class="text-gray-400">Example: <code class="bg-gray-700 px-1 rounded">^help (\w+)</code> will match "help command", "help me", etc.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Toast container -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50"></div>
+
+    <!-- Create/Edit Tag Modal -->
+    <div id="tag-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-gray-800 rounded-lg p-6 w-full max-w-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold" id="modal-title">Create New Tag</h3>
+                <button onclick="hideTagModal()" class="text-gray-400 hover:text-white">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="tag-form" onsubmit="handleTagSubmit(event)">
+                <input type="hidden" id="form-action" value="create">
+                <input type="hidden" id="original-tag-name" value="">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+                <div class="mb-4">
+                    <label for="tag-name" class="block text-sm font-medium text-gray-300 mb-2">Tag Name</label>
+                    <input type="text" id="tag-name" name="name" required
+                           class="w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <p class="mt-1 text-xs text-gray-400">A unique identifier for this tag</p>
+                </div>
+
+                <div class="mb-4">
+                    <label for="tag-pattern" class="block text-sm font-medium text-gray-300 mb-2">Pattern</label>
+                    <input type="text" id="tag-pattern" name="pattern" required
+                           class="w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <p class="mt-1 text-xs text-gray-400">The pattern to match against messages</p>
+                </div>
+
+                <div class="mb-4">
+                    <label for="tag-response" class="block text-sm font-medium text-gray-300 mb-2">Response</label>
+                    <textarea id="tag-response" name="response" required rows="4"
+                              class="w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
+                    <p class="mt-1 text-xs text-gray-400">The response the bot will send when a message matches the pattern</p>
+                </div>
+
+                <div class="flex mb-6">
+                    <div class="mr-6">
+                        <label for="is-regex" class="flex items-center">
+                            <input type="checkbox" id="is-regex" name="isRegex"
+                                   class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-600 rounded bg-gray-700">
+                            <span class="ml-2 text-sm text-gray-300">Use regex pattern</span>
+                        </label>
+                    </div>
+                    <div id="enabled-container" class="hidden">
+                        <label for="is-enabled" class="flex items-center">
+                            <input type="checkbox" id="is-enabled" name="isEnabled" checked
+                                   class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-600 rounded bg-gray-700">
+                            <span class="ml-2 text-sm text-gray-300">Enabled</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="flex justify-end space-x-3">
+                    <button type="button" onclick="hideTagModal()" 
+                            class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit" 
+                            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors">
+                        <span id="submit-button-text">Create Tag</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- View Tag Modal -->
+    <div id="view-tag-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-gray-800 rounded-lg p-6 w-full max-w-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold" id="view-modal-title">View Tag</h3>
+                <button onclick="hideViewTagModal()" class="text-gray-400 hover:text-white">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <h4 class="text-sm font-medium text-gray-400">Name</h4>
+                    <p id="view-tag-name" class="text-white"></p>
+                </div>
+                <div>
+                    <h4 class="text-sm font-medium text-gray-400">Pattern</h4>
+                    <p id="view-tag-pattern" class="text-white bg-gray-700 p-2 rounded"></p>
+                </div>
+                <div>
+                    <h4 class="text-sm font-medium text-gray-400">Type</h4>
+                    <p id="view-tag-type" class="text-white"></p>
+                </div>
+                <div>
+                    <h4 class="text-sm font-medium text-gray-400">Status</h4>
+                    <p id="view-tag-status" class="text-white"></p>
+                </div>
+                <div>
+                    <h4 class="text-sm font-medium text-gray-400">Response</h4>
+                    <div id="view-tag-response" class="text-white bg-gray-700 p-2 rounded whitespace-pre-wrap"></div>
+                </div>
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button onclick="hideViewTagModal()" 
+                            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="delete-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-gray-800 rounded-lg p-6 w-full max-w-md">
+            <div class="mb-4">
+                <h3 class="text-xl font-bold text-white">Delete Tag</h3>
+                <p class="text-gray-300 mt-2">Are you sure you want to delete tag "<span id="delete-tag-name"></span>"? This action cannot be undone.</p>
+            </div>
+            <div class="flex justify-end space-x-3">
+                <button onclick="hideDeleteModal()" 
+                        class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors">
+                    Cancel
+                </button>
+                <button onclick="deleteTag()" 
+                        class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded transition-colors">
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Plugin toggle functionality
+        async function togglePlugin(guildId, pluginId, enabled) {
+            try {
+                const response = await fetch(`/dashboard/plugins/toggle/${guildId}/${pluginId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'CSRF-Token': '<%= csrfToken %>'
+                    },
+                    body: JSON.stringify({ enabled })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showToast(result.message, 'success');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    throw new Error(result.error || 'Failed to update plugin status');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showToast(error.message, 'error');
+                document.getElementById('plugin-toggle').checked = !enabled;
+            }
+        }
+
+        // Tag modal functionality
+        function showTagModal() {
+            document.getElementById('tag-modal').classList.remove('hidden');
+            document.getElementById('form-action').value = 'create';
+            document.getElementById('modal-title').textContent = 'Create New Tag';
+            document.getElementById('submit-button-text').textContent = 'Create Tag';
+            document.getElementById('tag-form').reset();
+            document.getElementById('enabled-container').classList.add('hidden');
+        }
+        
+        function hideTagModal() {
+            document.getElementById('tag-modal').classList.add('hidden');
+        }
+        
+        function showEditTagModal(name, pattern, response, isRegex, isEnabled) {
+            document.getElementById('tag-modal').classList.remove('hidden');
+            document.getElementById('form-action').value = 'update';
+            document.getElementById('modal-title').textContent = 'Edit Tag';
+            document.getElementById('submit-button-text').textContent = 'Update Tag';
+            document.getElementById('original-tag-name').value = name;
+            
+            document.getElementById('tag-name').value = name;
+            document.getElementById('tag-name').readOnly = true;
+            document.getElementById('tag-pattern').value = pattern;
+            document.getElementById('tag-response').value = response;
+            document.getElementById('is-regex').checked = isRegex;
+            
+            document.getElementById('enabled-container').classList.remove('hidden');
+            document.getElementById('is-enabled').checked = isEnabled;
+        }
+        
+        function showViewTagModal(name, pattern, response, isRegex, isEnabled) {
+            document.getElementById('view-tag-modal').classList.remove('hidden');
+            document.getElementById('view-modal-title').textContent = 'View Tag: ' + name;
+            
+            document.getElementById('view-tag-name').textContent = name;
+            document.getElementById('view-tag-pattern').textContent = pattern;
+            document.getElementById('view-tag-type').textContent = isRegex ? 'Regex' : 'Wildcard';
+            document.getElementById('view-tag-status').textContent = isEnabled ? 'Enabled' : 'Disabled';
+            document.getElementById('view-tag-response').textContent = response;
+        }
+        
+        function hideViewTagModal() {
+            document.getElementById('view-tag-modal').classList.add('hidden');
+        }
+        
+        function confirmDeleteTag(name) {
+            document.getElementById('delete-modal').classList.remove('hidden');
+            document.getElementById('delete-tag-name').textContent = name;
+            document.getElementById('delete-tag-name').dataset.name = name;
+        }
+        
+        function hideDeleteModal() {
+            document.getElementById('delete-modal').classList.add('hidden');
+        }
+        
+        async function handleTagSubmit(event) {
+    event.preventDefault();
+    console.log("Form submission started");
+    
+    const action = document.getElementById('form-action').value;
+    const name = document.getElementById('tag-name').value;
+    const pattern = document.getElementById('tag-pattern').value;
+    const response = document.getElementById('tag-response').value;
+    const isRegex = document.getElementById('is-regex').checked;
+    
+    // Important: Get the actual status of the checkbox without using fallback
+    // When editing, the checkbox exists and we should respect its actual state
+    const isEnabled = document.getElementById('enabled-container').classList.contains('hidden') 
+        ? true // For new tags, default to enabled
+        : document.getElementById('is-enabled').checked; // For existing tags, use actual state
+    
+    console.log("Form data:", { action, name, pattern, response, isRegex, isEnabled });
+    
+    try {
+        let apiResponse;
+        
+        if (action === 'create') {
+            console.log("Making create request");
+            apiResponse = await fetch(`/dashboard/plugins/tags/<%= guild.id %>/create`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'CSRF-Token': '<%= csrfToken %>'
+                },
+                body: JSON.stringify({
+                    name,
+                    pattern,
+                    response,
+                    isRegex
+                })
+            });
+        } else if (action === 'update') {
+            const originalName = document.getElementById('original-tag-name').value;
+            console.log("Making update request for", originalName, "with enabled status:", isEnabled);
+            
+            apiResponse = await fetch(`/dashboard/plugins/tags/<%= guild.id %>/update/${originalName}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'CSRF-Token': '<%= csrfToken %>'
+                },
+                body: JSON.stringify({
+                    pattern,
+                    response,
+                    isRegex,
+                    isEnabled
+                })
+            });
+        }
+        
+        const result = await apiResponse.json();
+        console.log("API response:", result);
+        
+        if (apiResponse.ok) {
+            showToast(result.message, 'success');
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            throw new Error(result.error || 'Failed to ' + action + ' tag');
+        }
+        
+        hideTagModal();
+    } catch (error) {
+        console.error('Error:', error);
+        showToast(error.message, 'error');
+    }
+}
+        
+        async function deleteTag() {
+            try {
+                const name = document.getElementById('delete-tag-name').dataset.name;
+                
+                const response = await fetch(`/dashboard/plugins/tags/<%= guild.id %>/delete/${name}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'CSRF-Token': '<%= csrfToken %>'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showToast(result.message, 'success');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    throw new Error(result.error || 'Failed to delete tag');
+                }
+                
+                hideDeleteModal();
+            } catch (error) {
+                console.error('Error:', error);
+                showToast(error.message, 'error');
+                hideDeleteModal();
+            }
+        }
+        
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `${type === 'success' ? 'bg-green-500' : 'bg-red-500'} text-white px-6 py-3 rounded shadow-lg mb-2`;
+            toast.textContent = message;
+            
+            const container = document.getElementById('toast-container');
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'transition-opacity');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+    </script>
+
+    <%- include('../partials/footer') %>
+</body>
+</html>

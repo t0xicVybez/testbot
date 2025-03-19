@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Support Tickets - Discord Bot</title>
+    <link href="/css/output.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex flex-col">
+    <%- include('../partials/header') %>
+
+    <main class="flex-grow container mx-auto px-4 py-8">
+        <div class="flex items-center justify-between mb-8">
+            <div>
+                <h1 class="text-3xl font-bold">Support Tickets</h1>
+                <p class="text-gray-400">Server: <%= guild.name %></p>
+            </div>
+            <div class="space-x-2">
+                <a href="/dashboard/plugins" class="text-gray-400 hover:text-white transition-colors">
+                    <i class="fas fa-arrow-left mr-2"></i>
+                    Back to Plugins
+                </a>
+            </div>
+        </div>
+
+        <div class="bg-gray-800 rounded-lg p-6 mb-8">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-xl font-semibold">Plugin Status: 
+                        <span class="<%= isEnabled ? 'text-green-400' : 'text-red-400' %>">
+                            <%= isEnabled ? 'Enabled' : 'Disabled' %>
+                        </span>
+                    </h2>
+                    <p class="text-gray-300 mt-2">
+                        Support Tickets enable your members to create tickets for support requests or inquiries.
+                    </p>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" 
+                        class="sr-only peer" 
+                        <%= isEnabled ? 'checked' : '' %>
+                        id="plugin-toggle"
+                        onchange="togglePlugin('<%= guild.id %>', 'tickets', this.checked)">
+                    <div class="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+            </div>
+        </div>
+
+        <!-- Tabs Navigation -->
+        <div class="mb-6 border-b border-gray-700">
+            <ul class="flex flex-wrap -mb-px">
+                <li class="mr-2">
+                    <a href="#settings" class="inline-block py-4 px-4 text-center border-b-2 border-transparent rounded-t-lg hover:text-blue-400 hover:border-blue-400 active-tab" onclick="showTab('settings')">
+                        <i class="fas fa-cog mr-2"></i>Settings
+                    </a>
+                </li>
+                <li class="mr-2">
+                    <a href="#panels" class="inline-block py-4 px-4 text-center border-b-2 border-transparent rounded-t-lg hover:text-blue-400 hover:border-blue-400" onclick="showTab('panels')">
+                        <i class="fas fa-th-large mr-2"></i>Ticket Panels
+                    </a>
+                </li>
+                <li class="mr-2">
+                    <a href="#tickets" class="inline-block py-4 px-4 text-center border-b-2 border-transparent rounded-t-lg hover:text-blue-400 hover:border-blue-400" onclick="showTab('tickets')">
+                        <i class="fas fa-ticket-alt mr-2"></i>Tickets
+                    </a>
+                </li>
+                <li class="mr-2">
+                    <a href="#responses" class="inline-block py-4 px-4 text-center border-b-2 border-transparent rounded-t-lg hover:text-blue-400 hover:border-blue-400" onclick="showTab('responses')">
+                        <i class="fas fa-reply mr-2"></i>Responses
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="settings-tab" class="tab-content">
+            <div class="bg-gray-800 rounded-lg p-6">
+                <h3 class="text-xl font-semibold mb-4">Ticket Settings</h3>
+                <form id="settings-form" class="space-y-6">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="category-id" class="block text-sm font-medium text-gray-300 mb-2">
+                                Ticket Category <span class="text-red-400">*</span>
+                            </label>
+                            <select id="category-id" name="categoryId" required
+                                   class="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">Select a category</option>
+                                <% categories.forEach(category => { %>
+                                    <option value="<%= category.id %>" <%= settings.category_id === category.id ? 'selected' : '' %>><%= category.name %></option>
+                                <% }); %>
+                            </select>
+                            <p class="mt-1 text-xs text-gray-400">The category where ticket channels will be created</p>
+                        </div>
+                        
+                        <div>
+                            <label for="log-channel-id" class="block text-sm font-medium text-gray-300 mb-2">
+                                Log Channel
+                            </label>
+                            <select id="log-channel-id" name="logChannelId"
+                                   class="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">None</option>
+                                <% channels.forEach(channel => { %>
+                                    <option value="<%= channel.id %>" <%= settings.log_channel_id === channel.id ? 'selected' : '' %>>#<%= channel.name %></option>
+                                <% }); %>
+                            </select>
+                            <p class="mt-1 text-xs text-gray-400">Channel for logging ticket actions (optional)</p>
+                        </div>
+                        
+                        <div>
+                            <label for="support-role-id" class="block text-sm font-medium text-gray-300 mb-2">
+                                Support Role <span class="text-red-400">*</span>
+                            </label>
+                            <select id="support-role-id" name="supportRoleId" required
+                                   class="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">Select a role</option>
+                                <% roles.forEach(role => { %>
+                                    <option value="<%= role.id %>" <%= settings.support_role_id === role.id ? 'selected' : '' %>><%= role.name %></option>
+                                <% }); %>
+                            </select>
+                            <p class="mt-1 text-xs text-gray-400">Role that can access and manage tickets</p>
+                        </div>
+                        
+                        <div>
+                            <label for="ticket-name-format" class="block text-sm font-medium text-gray-300 mb-2">
+                                Ticket Name Format
+                            </label>
+                            <input type="text" id="ticket-name-format" name="ticketNameFormat" 
+                                   value="<%= settings.ticket_name_format || 'ticket-{number}' %>"
+                                   class="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <p class="mt-1 text-xs text-gray-400">Use {number} to include the ticket number</p>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label for="welcome-message" class="block text-sm font-medium text-gray-300 mb-2">
+                            Welcome Message
+                        </label>
+                        <textarea id="welcome-message" name="welcomeMessage" rows="4"
+                                  class="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"><%= settings.welcome_message %></textarea>
+                        <p class="mt-1 text-xs text-gray-400">Message sent when a ticket is created</p>
+                    </div>
+                    
+                    <div class="flex justify-end pt-4">
+                        <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors">
+                            <i class="fas fa-save mr-2"></i>Save Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Ticket Panels Tab -->
+        <div id="panels-tab" class="tab-content hidden">
+            <div class="bg-gray-800 rounded-lg p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold">Ticket Panels</h3>
+                    <button onclick="showPanelModal('create')" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors">
+                        <i class="fas fa-plus mr-2"></i>Create Panel
+                    </button>
+                </div>
+                
+                <p class="text-gray-300 mb-4">
+                    Create and manage ticket panels that allow users to open support tickets.
+                </p>
+                
+                <% if (panels && panels.length > 0) { %>
+                    <div class="space-y-4">
+                        <% panels.forEach(panel => { %>
+                            <div class="bg-gray-700 rounded-lg p-4">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <h4 class="font-semibold"><%= panel.name %></h4>
+                                        <p class="text-sm text-gray-400">
+                                            <span class="inline-block mr-4">
+                                                <i class="fas fa-hashtag mr-1"></i>
+                                                <a href="https://discord.com/channels/<%= guild.id %>/<%= panel.channel_id %>/<%=panel.message_id %>" target="_blank" class="text-blue-400 hover:underline">
+                                                    <%= channels.find(c => c.id === panel.channel_id)?.name || 'Unknown Channel' %>
+                                                </a>
+                                            </span>
+                                            <span class="inline-block">
+                                                <i class="fas fa-calendar-alt mr-1"></i>
+                                                <%= new Date(panel.created_at).toLocaleDateString() %>
+                                            </span>
+                                        </p>
+                                    </div>
+                                    <div class="flex space-x-2">
+                                        <button onclick="editPanel('<%= panel.id %>', '<%= panel.channel_id %>')" 
+                                                class="text-yellow-400 hover:text-yellow-300 transition-colors">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button onclick="confirmDeletePanel('<%= panel.id %>', '<%= panel.channel_id %>', '<%= panel.message_id %>')" 
+                                                class="text-red-400 hover:text-red-300 transition-colors">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="mt-3">
+                                    <div class="bg-gray-800 rounded p-3">
+                                        <div style="border-left: 4px solid <%= panel.color || '#3498DB' %>;" class="pl-3">
+                                            <h5 class="font-medium"><%= panel.title %></h5>
+                                            <p class="text-sm text-gray-300"><%= panel.description %></p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        <% }); %>
+                    </div>
+                <% } else { %>
+                    <div class="text-center py-8">
+                        <p class="text-gray-400 mb-4">No ticket panels have been created.</p>
+                        <button onclick="showPanelModal('create')" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+                            <i class="fas fa-plus mr-2"></i>Create Your First Panel
+                        </button>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+        <!-- Tickets Tab -->
+        <div id="tickets-tab" class="tab-content hidden">
+            <div class="bg-gray-800 rounded-lg p-6">
+                <h3 class="text-xl font-semibold mb-4">Active Tickets</h3>
+                
+                <% if (tickets && tickets.length > 0) { %>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="bg-gray-700">
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Ticket #</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Subject</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Created</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-700">
+                                <% tickets.forEach(ticket => { %>
+                                    <tr class="hover:bg-gray-700">
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                            #<%= ticket.ticket_number %>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                            <%= ticket.subject %>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                            <% if (ticket.status === 'open') { %>
+                                                <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">Open</span>
+                                            <% } else if (ticket.status === 'claimed') { %>
+                                                <span class="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs">Claimed</span>
+                                            <% } else if (ticket.status === 'closed') { %>
+                                                <span class="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">Closed</span>
+                                            <% } %>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                            <%= new Date(ticket.created_at).toLocaleString() %>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                            <div class="flex space-x-2">
+                                                <button onclick="viewTicket('<%= ticket.channel_id %>')" 
+                                                        class="text-blue-400 hover:text-blue-300 transition-colors" 
+                                                        title="View Ticket">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                <% }); %>
+                            </tbody>
+                        </table>
+                    </div>
+                <% } else { %>
+                    <div class="text-center py-8">
+                        <p class="text-gray-400">No active tickets found.</p>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+
+        <!-- Responses Tab -->
+        <div id="responses-tab" class="tab-content hidden">
+            <div class="bg-gray-800 rounded-lg p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold">Saved Responses</h3>
+                    <button onclick="showResponseModal('create')" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors">
+                        <i class="fas fa-plus mr-2"></i>Add Response
+                    </button>
+                </div>
+                
+                <p class="text-gray-300 mb-4">
+                    Create quick responses for commonly used messages in your tickets.
+                </p>
+                
+                <% if (responses && responses.length > 0) { %>
+                    <div class="space-y-4">
+                        <% responses.forEach(response => { %>
+                            <div class="bg-gray-700 rounded-lg p-4">
+                                <div class="flex justify-between items-center mb-2">
+                                    <h4 class="font-semibold"><%= response.name %></h4>
+                                    <div class="flex space-x-2">
+                                        <button onclick="showResponseModal('edit', '<%= response.name %>', `<%= response.content.replace(/`/g, '\\`').replace(/'/g, "\\'").replace(/"/g, '\\"') %>`)" 
+                                                class="text-yellow-400 hover:text-yellow-300 transition-colors">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button onclick="confirmDeleteResponse('<%= response.name %>')" 
+                                                class="text-red-400 hover:text-red-300 transition-colors">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="bg-gray-800 p-3 rounded whitespace-pre-wrap">
+                                    <%= response.content %>
+                                </div>
+                            </div>
+                        <% }); %>
+                    </div>
+                <% } else { %>
+                    <div class="text-center py-8">
+                        <p class="text-gray-400 mb-4">No saved responses found.</p>
+                        <button onclick="showResponseModal('create')" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+                            <i class="fas fa-plus mr-2"></i>Create Your First Response
+                        </button>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+    </main>
+
+    <!-- Response Modal -->
+    <div id="response-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-gray-800 rounded-lg p-6 w-full max-w-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold" id="response-modal-title">Create New Response</h3>
+                <button onclick="hideResponseModal()" class="text-gray-400 hover:text-white">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="response-form" onsubmit="handleResponseSubmit(event)">
+                <input type="hidden" id="response-action" value="create">
+                <input type="hidden" id="original-response-name" value="">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+                <div class="mb-4">
+                    <label for="response-name" class="block text-sm font-medium text-gray-300 mb-2">Response Name</label>
+                    <input type="text" id="response-name" name="name" required
+                           class="w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <p class="mt-1 text-xs text-gray-400">A unique identifier for this response</p>
+                </div>
+
+                <div class="mb-6">
+                    <label for="response-content" class="block text-sm font-medium text-gray-300 mb-2">Response Content</label>
+                    <textarea id="response-content" name="content" required rows="6"
+                              class="w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
+                    <p class="mt-1 text-xs text-gray-400">The content of the response</p>
+                </div>
+
+                <div class="flex justify-end space-x-3">
+                    <button type="button" onclick="hideResponseModal()" 
+                            class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit" 
+                            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors">
+                        <span id="response-submit-text">Create Response</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Response Confirmation Modal -->
+    <div id="delete-response-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-gray-800 rounded-lg p-6 w-full max-w-md">
+            <div class="mb-4">
+                <h3 class="text-xl font-bold text-white">Delete Response</h3>
+                <p class="text-gray-300 mt-2">Are you sure you want to delete the response "<span id="delete-response-name"></span>"? This action cannot be undone.</p>
+            </div>
+            <div class="flex justify-end space-x-3">
+                <button onclick="hideDeleteResponseModal()" 
+                        class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors">
+                    Cancel
+                </button>
+                <button onclick="deleteResponse()" 
+                        class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded transition-colors">
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast container -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50"></div>
+
+    <script>
+        // Tab functionality
+        function showTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.add('hidden');
+            });
+            
+            // Remove active class from all tab links
+            document.querySelectorAll('.active-tab').forEach(link => {
+                link.classList.remove('active-tab', 'text-blue-400', 'border-blue-400');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabName + '-tab').classList.remove('hidden');
+            
+            // Add active class to selected tab link
+            document.querySelector(`a[href="#${tabName}"]`).classList.add('active-tab', 'text-blue-400', 'border-blue-400');
+            
+            // Update URL hash
+            window.location.hash = tabName;
+        }
+        
+        // Check URL hash on page load and select appropriate tab
+        document.addEventListener('DOMContentLoaded', () => {
+            const hash = window.location.hash.substring(1);
+            if (['settings', 'tickets', 'responses'].includes(hash)) {
+                showTab(hash);
+            }
+        });
+        
+        // Plugin toggle functionality
+        async function togglePlugin(guildId, pluginId, enabled) {
+            try {
+                const response = await fetch(`/dashboard/plugins/toggle/${guildId}/${pluginId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'CSRF-Token': '<%= csrfToken %>'
+                    },
+                    body: JSON.stringify({ enabled })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showToast(result.message, 'success');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    throw new Error(result.error || 'Failed to update plugin status');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showToast(error.message, 'error');
+                document.getElementById('plugin-toggle').checked = !enabled;
+            }
+        }
+
+        // Settings form functionality
+        document.getElementById('settings-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const data = {
+                categoryId: formData.get('categoryId'),
+                logChannelId: formData.get('logChannelId'),
+                supportRoleId: formData.get('supportRoleId'),
+                welcomeMessage: formData.get('welcomeMessage'),
+                ticketNameFormat: formData.get('ticketNameFormat')
+            };
+            
+            try {
+                showToast('Saving settings...', 'info');
+                
+                const response = await fetch(`/dashboard/plugins/tickets/<%= guild.id %>/settings`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'CSRF-Token': '<%= csrfToken %>'
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showToast(result.message, 'success');
+                } else {
+                    throw new Error(result.error || 'Failed to save settings');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showToast(error.message, 'error');
+            }
+        });
+        
+        // Response modal functionality
+        function showResponseModal(action, name = '', content = '') {
+            document.getElementById('response-modal').classList.remove('hidden');
+            document.getElementById('response-action').value = action;
+            
+            if (action === 'create') {
+                document.getElementById('response-modal-title').textContent = 'Create New Response';
+                document.getElementById('response-submit-text').textContent = 'Create Response';
+                document.getElementById('response-name').readOnly = false;
+                document.getElementById('response-form').reset();
+            } else if (action === 'edit') {
+                document.getElementById('response-modal-title').textContent = 'Edit Response';
+                document.getElementById('response-submit-text').textContent = 'Update Response';
+                document.getElementById('original-response-name').value = name;
+                document.getElementById('response-name').value = name;
+                document.getElementById('response-name').readOnly = true;
+                document.getElementById('response-content').value = content;
+            }
+        }
+        
+        function hideResponseModal() {
+            document.getElementById('response-modal').classList.add('hidden');
+        }
+        
+        function confirmDeleteResponse(name) {
+            document.getElementById('delete-response-modal').classList.remove('hidden');
+            document.getElementById('delete-response-name').textContent = name;
+            document.getElementById('delete-response-name').dataset.name = name;
+        }
+        
+        function hideDeleteResponseModal() {
+            document.getElementById('delete-response-modal').classList.add('hidden');
+        }
+        
+        async function handleResponseSubmit(event) {
+            event.preventDefault();
+            
+            const action = document.getElementById('response-action').value;
+            const name = document.getElementById('response-name').value;
+            const content = document.getElementById('response-content').value;
+            
+            try {
+                let url;
+                let method = 'POST';
+                let body;
+                
+                if (action === 'create') {
+                    url = `/dashboard/plugins/tickets/<%= guild.id %>/responses/create`;
+                    body = { name, content };
+                } else if (action === 'edit') {
+                    const originalName = document.getElementById('original-response-name').value;
+                    url = `/dashboard/plugins/tickets/<%= guild.id %>/responses/update/${originalName}`;
+                    body = { content };
+                }
+                
+                const response = await fetch(url, {
+                    method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'CSRF-Token': '<%= csrfToken %>'
+                    },
+                    body: JSON.stringify(body)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showToast(result.message, 'success');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    throw new Error(result.error || `Failed to ${action} response`);
+                }
+                
+                hideResponseModal();
+            } catch (error) {
+                console.error('Error:', error);
+                showToast(error.message, 'error');
+            }
+        }
+        
+        async function deleteResponse() {
+            try {
+                const name = document.getElementById('delete-response-name').dataset.name;
+                
+                const response = await fetch(`/dashboard/plugins/tickets/<%= guild.id %>/responses/delete/${name}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'CSRF-Token': '<%= csrfToken %>'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showToast(result.message, 'success');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    throw new Error(result.error || 'Failed to delete response');
+                }
+                
+                hideDeleteResponseModal();
+            } catch (error) {
+                console.error('Error:', error);
+                showToast(error.message, 'error');
+                hideDeleteResponseModal();
+            }
+        }
+        
+        function viewTicket(channelId) {
+            // Open ticket in Discord
+            window.open(`https://discord.com/channels/<%= guild.id %>/${channelId}`, '_blank');
+        }
+        
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `${type === 'success' ? 'bg-green-500' : type === 'info' ? 'bg-blue-500' : 'bg-red-500'} text-white px-6 py-3 rounded shadow-lg mb-2`;
+            toast.textContent = message;
+            
+            const container = document.getElementById('toast-container');
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'transition-opacity');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+    </script>
+
+    <%- include('../partials/footer') %>
+</body>
+</html>

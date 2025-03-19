@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plugins - Discord Bot</title>
+    <link href="/css/output.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex flex-col">
+    <%- include('../partials/header') %>
+
+    <main class="flex-grow container mx-auto px-4 py-8">
+        <div class="flex items-center justify-between mb-8">
+            <h1 class="text-3xl font-bold">Plugins</h1>
+            <a href="/dashboard" class="text-gray-400 hover:text-white transition-colors">
+                <i class="fas fa-arrow-left mr-2"></i>
+                Back to Dashboard
+            </a>
+        </div>
+
+        <div class="bg-gray-800 rounded-lg p-6 mb-8">
+            <p class="text-gray-300">
+                Plugins extend your bot's functionality with additional features. Enable or disable plugins for each server and configure their settings.
+            </p>
+        </div>
+
+        <% if (guilds && guilds.length > 0) { %>
+            <div class="space-y-8">
+                <% guilds.forEach(guild => { %>
+                    <div class="bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+                        <div class="p-6 border-b border-gray-700">
+                            <div class="flex items-center">
+                                <% if (guild.icon) { %>
+                                    <img src="<%= guild.iconURL %>" alt="<%= guild.name %>" class="w-12 h-12 rounded-full">
+                                <% } else { %>
+                                    <div class="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center">
+                                        <span class="text-xl font-bold"><%= guild.name.charAt(0) %></span>
+                                    </div>
+                                <% } %>
+                                <h2 class="ml-4 text-xl font-bold"><%= guild.name %></h2>
+                            </div>
+                        </div>
+
+                        <div class="divide-y divide-gray-700">
+                            <% plugins.forEach(plugin => { %>
+                                <div class="p-6 flex items-center justify-between">
+                                    <div class="flex items-start space-x-4">
+                                        <div class="text-2xl text-blue-400 mt-1">
+                                            <i class="fas <%= plugin.icon %>"></i>
+                                        </div>
+                                        <div>
+                                            <h3 class="font-semibold text-lg"><%= plugin.name %></h3>
+                                            <p class="text-gray-400 text-sm"><%= plugin.description %></p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="flex items-center space-x-4">
+                                        <!-- Toggle Switch -->
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" 
+                                                class="sr-only peer" 
+                                                <%= guild.plugins.find(p => p.id === plugin.id)?.isEnabled ? 'checked' : '' %>
+                                                onchange="togglePlugin('<%= guild.id %>', '<%= plugin.id %>', this.checked)">
+                                            <div class="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                        </label>
+                                        
+                                        <!-- Settings Button -->
+                                        <a href="/dashboard/plugins/<%= plugin.id %>/<%= guild.id %>" 
+                                            class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors">
+                                            <i class="fas fa-cog mr-2"></i>Settings
+                                        </a>
+                                    </div>
+                                </div>
+                            <% }); %>
+                        </div>
+                    </div>
+                <% }); %>
+            </div>
+        <% } else { %>
+            <div class="text-center py-12">
+                <h2 class="text-2xl font-semibold mb-4">No Servers Found</h2>
+                <p class="text-gray-400 mb-6">Add the bot to one of your servers to get started with plugins.</p>
+                <a href="https://discord.com/api/oauth2/authorize?client_id=<%= process.env.DISCORD_CLIENT_ID %>&permissions=8&scope=bot%20applications.commands" 
+                   class="inline-block bg-indigo-600 hover:bg-indigo-700 px-6 py-3 rounded-md transition-colors">
+                    <i class="fas fa-plus mr-2"></i>
+                    Add to Server
+                </a>
+            </div>
+        <% } %>
+    </main>
+
+    <!-- Toast container -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50"></div>
+
+    <script>
+        async function togglePlugin(guildId, pluginId, enabled) {
+            try {
+                const response = await fetch(`/dashboard/plugins/toggle/${guildId}/${pluginId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'CSRF-Token': '<%= csrfToken %>'
+                    },
+                    body: JSON.stringify({ enabled })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showToast(result.message, 'success');
+                } else {
+                    throw new Error(result.error || 'Failed to update plugin status');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showToast(error.message, 'error');
+            }
+        }
+        
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `${type === 'success' ? 'bg-green-500' : 'bg-red-500'} text-white px-6 py-3 rounded shadow-lg mb-2`;
+            toast.textContent = message;
+            
+            const container = document.getElementById('toast-container');
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'transition-opacity');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+    </script>
+
+    <%- include('../partials/footer') %>
+</body>
+</html>

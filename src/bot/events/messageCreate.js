@@ -1,12 +1,29 @@
 const { Guilds } = require('../../database/guilds');
+const { Tags } = require('../../database/tags');
 const logger = require('../../utils/logger');
 
 module.exports = {
     name: 'messageCreate',
     async execute(message) {
         try {
+            // Ignore messages from bots
             if (message.author.bot) return;
-
+            
+            // Only process messages in guilds
+            if (!message.guild) return;
+            
+            // Check for auto-response tags first
+            try {
+                const response = await Tags.processMessage(message);
+                if (response) {
+                    await message.channel.send(response);
+                    // If we sent an auto-response, we still continue to process commands
+                }
+            } catch (tagError) {
+                logger.error('Error processing tags:', tagError);
+                // Continue with command processing even if tag processing fails
+            }
+            
             // Get guild settings for prefix
             const guildSettings = await Guilds.getGuildSettings(message.guildId);
             const prefix = guildSettings?.prefix || '!';
@@ -53,4 +70,4 @@ module.exports = {
             logger.error('Error handling message:', error);
         }
     }
-}; 
+};
