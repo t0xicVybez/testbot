@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Discord Bot</title>
+    <link href="/css/output.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex flex-col">
+    <%- include('partials/header') %>
+
+    <main class="flex-grow container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold mb-8">Your Servers</h1>
+
+        <% if (guilds && guilds.length > 0) { %>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <% guilds.forEach(guild => { %>
+                    <div class="bg-gray-800 rounded-lg shadow-lg p-6">
+                        <div class="flex items-center mb-4">
+                            <% if (guild.icon) { %>
+                                <img src="<%= guild.iconURL %>" alt="<%= guild.name %>" class="w-12 h-12 rounded-full">
+                            <% } else { %>
+                                <div class="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center">
+                                    <span class="text-xl font-bold text-white"><%= guild.name.charAt(0) %></span>
+                                </div>
+                            <% } %>
+                            <h2 class="ml-4 text-xl font-bold text-white"><%= guild.name %></h2>
+                        </div>
+                        <div class="space-y-2">
+                            <a href="/dashboard/servers/<%= guild.id %>/settings"
+                               class="block w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded transition duration-200">
+                                <i class="fas fa-cog mr-2"></i>
+                                Settings
+                            </a>
+                            <a href="/dashboard/servers/<%= guild.id %>/commands"
+                               class="block w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded transition duration-200">
+                                <i class="fas fa-terminal mr-2"></i>
+                                Commands
+                            </a>
+                        </div>
+                    </div>
+                <% }) %>
+            </div>
+        <% } else { %>
+            <div class="text-center py-12">
+                <h2 class="text-2xl font-semibold mb-4">No Servers Found</h2>
+                <p class="text-gray-400 mb-6">Add the bot to one of your servers to get started.</p>
+                <a href="https://discord.com/api/oauth2/authorize?client_id=<%= process.env.DISCORD_CLIENT_ID %>&permissions=8&scope=bot%20applications.commands" 
+                   class="inline-block bg-indigo-600 hover:bg-indigo-700 px-6 py-3 rounded-md transition-colors">
+                    <i class="fas fa-plus mr-2"></i>
+                    Add to Server
+                </a>
+            </div>
+        <% } %>
+    </main>
+
+    <%- include('partials/footer') %>
+</body>
+</html> 

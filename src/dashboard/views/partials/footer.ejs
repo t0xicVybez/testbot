@@ -1,0 +1,19 @@
+    </main>
+    <footer class="bg-gray-800 py-4 mt-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center">
+                <div class="text-gray-400 text-sm">
+                    © <%= new Date().getFullYear() %> Discord Bot. All rights reserved.
+                </div>
+                <div class="flex space-x-4">
+                    <a href="/dashboard" class="text-gray-400 hover:text-white transition-colors">Dashboard</a>
+                    <a href="https://discord.com/api/oauth2/authorize?client_id=<%= process.env.DISCORD_CLIENT_ID %>&permissions=8&scope=bot%20applications.commands" 
+                       class="text-gray-400 hover:text-white transition-colors">Add to Server</a>
+                    <a href="https://github.com/yourusername/discord-bot" 
+                       class="text-gray-400 hover:text-white transition-colors">GitHub</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+</body>
+</html> 

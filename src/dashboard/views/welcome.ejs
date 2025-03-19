@@ -1,0 +1,158 @@
+<%- include('partials/header') %>
+
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold text-gray-800 dark:text-white">Welcome Message Configuration</h1>
+        <a href="/dashboard" class="text-blue-500 hover:text-blue-700">← Back to Dashboard</a>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-6">
+        <form id="welcomeForm" class="space-y-6">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            
+            <!-- Welcome Channel Selection -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Welcome Channel
+                </label>
+                <select name="welcomeChannel" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    <option value="">Select a channel</option>
+                    <% guild.channels.cache.filter(channel => channel.type === 0).forEach(channel => { %>
+                        <option value="<%= channel.id %>" <%= guildSettings.settings.welcomeChannel === channel.id ? 'selected' : '' %>>
+                            #<%= channel.name %>
+                        </option>
+                    <% }); %>
+                </select>
+            </div>
+
+            <!-- Auto Role Selection -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Auto Role
+                </label>
+                <select name="autoRole" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    <option value="">Select a role</option>
+                    <% guild.roles.cache.filter(role => role.id !== guild.id).forEach(role => { %>
+                        <option value="<%= role.id %>" <%= guildSettings.settings.autoRole === role.id ? 'selected' : '' %>>
+                            <%= role.name %>
+                        </option>
+                    <% }); %>
+                </select>
+            </div>
+
+            <!-- Welcome Message Preview -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Message Preview
+                </label>
+                <div class="bg-gray-100 dark:bg-gray-900 rounded-lg p-4">
+                    <div class="flex items-start space-x-4">
+                        <div class="flex-shrink-0">
+                            <img src="<%= guild.iconURL() %>" alt="Server Icon" class="h-10 w-10 rounded-full">
+                        </div>
+                        <div>
+                            <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow">
+                                <h4 class="text-lg font-semibold text-gray-900 dark:text-white">Welcome to the Server! 👋</h4>
+                                <p class="text-gray-600 dark:text-gray-300">
+                                    Welcome @User to <strong><%= guild.name %></strong>!
+                                    <br>You are our Nth member!
+                                </p>
+                                <div class="mt-2">
+                                    <h5 class="font-medium text-gray-900 dark:text-white">Getting Started</h5>
+                                    <ul class="list-disc list-inside text-gray-600 dark:text-gray-300">
+                                        <li>Check out our rules channel</li>
+                                        <li>Get roles in role-selection</li>
+                                        <li>Introduce yourself!</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-end space-x-3">
+                <button type="button" onclick="testWelcome()" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">
+                    Test Message
+                </button>
+                <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                    Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.getElementById('welcomeForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const data = {
+        welcomeChannel: form.welcomeChannel.value,
+        autoRole: form.autoRole.value,
+        _csrf: form._csrf.value
+    };
+
+    try {
+        const response = await fetch(`/api/guilds/<%= guild.id %>/settings`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': data._csrf
+            },
+            body: JSON.stringify(data)
+        });
+
+        if (response.ok) {
+            showToast('Settings saved successfully!', 'success');
+        } else {
+            const error = await response.json();
+            showToast(error.error || 'Failed to save settings', 'error');
+        }
+    } catch (error) {
+        showToast('An error occurred while saving settings', 'error');
+    }
+});
+
+async function testWelcome() {
+    const channel = document.querySelector('select[name="welcomeChannel"]').value;
+    if (!channel) {
+        showToast('Please select a welcome channel first', 'warning');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/guilds/<%= guild.id %>/welcome/test`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': document.querySelector('input[name="_csrf"]').value
+            },
+            body: JSON.stringify({ channel })
+        });
+
+        if (response.ok) {
+            showToast('Test message sent!', 'success');
+        } else {
+            const error = await response.json();
+            showToast(error.error || 'Failed to send test message', 'error');
+        }
+    } catch (error) {
+        showToast('An error occurred while sending test message', 'error');
+    }
+}
+
+function showToast(message, type) {
+    const toast = document.createElement('div');
+    toast.className = `fixed bottom-4 right-4 px-6 py-3 rounded shadow-lg ${
+        type === 'success' ? 'bg-green-500' :
+        type === 'error' ? 'bg-red-500' :
+        'bg-yellow-500'
+    } text-white`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+</script>
+
+<%- include('partials/footer') %> 

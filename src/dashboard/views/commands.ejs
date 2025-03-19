@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Command Management - Discord Bot</title>
+    <link href="/css/output.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex flex-col">
+    <%- include('partials/header') %>
+
+    <main class="flex-grow container mx-auto px-4 py-8">
+        <div class="flex items-center justify-between mb-8">
+            <h1 class="text-3xl font-bold">Command Management</h1>
+            <a href="/dashboard" class="text-gray-400 hover:text-white transition-colors">
+                <i class="fas fa-arrow-left mr-2"></i>
+                Back to Dashboard
+            </a>
+        </div>
+
+        <div class="grid md:grid-cols-2 gap-6">
+            <!-- Slash Commands -->
+            <div class="bg-gray-800 rounded-lg p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-semibold">Slash Commands</h2>
+                    <div class="flex space-x-2">
+                        <button onclick="toggleAllCommands('SLASH', true)" 
+                                class="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm transition-colors">
+                            Enable All
+                        </button>
+                        <button onclick="toggleAllCommands('SLASH', false)" 
+                                class="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm transition-colors">
+                            Disable All
+                        </button>
+                    </div>
+                </div>
+                <div class="space-y-4">
+                    <% if (slashCommands && slashCommands.length > 0) { %>
+                        <% slashCommands.forEach(command => { %>
+                            <div class="flex items-center justify-between p-4 bg-gray-700 rounded-lg">
+                                <div>
+                                    <h3 class="font-medium">/<%= command.name %></h3>
+                                    <p class="text-sm text-gray-400"><%= command.description %></p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" 
+                                           class="sr-only peer" 
+                                           data-command="<%= command.name %>" 
+                                           data-type="SLASH"
+                                           <%= command.enabled ? 'checked' : '' %>
+                                           onchange="toggleCommand(this)">
+                                    <div class="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                </label>
+                            </div>
+                        <% }) %>
+                    <% } else { %>
+                        <p class="text-gray-400 text-center py-4">No slash commands available.</p>
+                    <% } %>
+                </div>
+            </div>
+
+            <!-- Prefix Commands -->
+            <div class="bg-gray-800 rounded-lg p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-semibold">Prefix Commands</h2>
+                    <div class="flex space-x-2">
+                        <button onclick="toggleAllCommands('PREFIX', true)" 
+                                class="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm transition-colors">
+                            Enable All
+                        </button>
+                        <button onclick="toggleAllCommands('PREFIX', false)" 
+                                class="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm transition-colors">
+                            Disable All
+                        </button>
+                    </div>
+                </div>
+                <div class="space-y-4">
+                    <% if (prefixCommands && prefixCommands.length > 0) { %>
+                        <% prefixCommands.forEach(command => { %>
+                            <div class="flex items-center justify-between p-4 bg-gray-700 rounded-lg">
+                                <div>
+                                    <h3 class="font-medium"><%= prefix %><%= command.name %></h3>
+                                    <p class="text-sm text-gray-400"><%= command.description %></p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" 
+                                           class="sr-only peer" 
+                                           data-command="<%= command.name %>" 
+                                           data-type="PREFIX"
+                                           <%= command.enabled ? 'checked' : '' %>
+                                           onchange="toggleCommand(this)">
+                                    <div class="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                </label>
+                            </div>
+                        <% }) %>
+                    <% } else { %>
+                        <p class="text-gray-400 text-center py-4">No prefix commands available.</p>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <%- include('partials/footer') %>
+
+    <!-- Toast container -->
+    <div id="toast-container" class="fixed bottom-4 right-4"></div>
+
+    <script>
+        async function toggleCommand(checkbox) {
+            const command = checkbox.dataset.command;
+            const type = checkbox.dataset.type;
+            const enabled = checkbox.checked;
+
+            try {
+                const response = await fetch(`/api/guilds/<%= guild.id %>/commands/${command}/toggle`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'CSRF-Token': '<%= csrfToken %>'
+                    },
+                    body: JSON.stringify({
+                        type,
+                        enabled
+                    })
+                });
+
+                if (!response.ok) {
+                    const data = await response.json();
+                    throw new Error(data.error || 'Failed to update command status');
+                }
+
+                showToast(`${type === 'SLASH' ? '/' : '<%= prefix %>'}${command} has been ${enabled ? 'enabled' : 'disabled'}`, 'success');
+            } catch (error) {
+                console.error('Error:', error);
+                checkbox.checked = !checkbox.checked; // Revert the checkbox state
+                showToast(error.message || 'Failed to update command status', 'error');
+            }
+        }
+
+        async function toggleAllCommands(type, enabled) {
+            try {
+                const response = await fetch(`/api/guilds/<%= guild.id %>/commands/bulk-toggle`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'CSRF-Token': '<%= csrfToken %>'
+                    },
+                    body: JSON.stringify({
+                        type,
+                        enabled,
+                        commands: Array.from(document.querySelectorAll(`input[data-type="${type}"]`))
+                            .map(checkbox => checkbox.dataset.command)
+                    })
+                });
+
+                if (!response.ok) {
+                    const data = await response.json();
+                    throw new Error(data.error || 'Failed to update commands');
+                }
+
+                // Update all checkboxes
+                document.querySelectorAll(`input[data-type="${type}"]`)
+                    .forEach(checkbox => checkbox.checked = enabled);
+
+                showToast(`All ${type.toLowerCase()} commands have been ${enabled ? 'enabled' : 'disabled'}`, 'success');
+            } catch (error) {
+                console.error('Error:', error);
+                showToast(error.message || 'Failed to update commands', 'error');
+            }
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `${type === 'success' ? 'bg-green-500' : 'bg-red-500'} text-white px-6 py-3 rounded shadow-lg mb-2`;
+            toast.textContent = message;
+            
+            const container = document.getElementById('toast-container');
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'transition-opacity');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+    </script>
+</body>
+</html> 
