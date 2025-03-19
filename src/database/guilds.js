@@ -46,6 +46,7 @@ class Guilds {
                 };
             });
 
+            // Standardize property names
             const settings = {
                 prefix: rows[0].prefix || '!',
                 welcomeChannel: rows[0].welcome_channel_id,
@@ -53,6 +54,9 @@ class Guilds {
                 autoRole: rows[0].auto_role_id,
                 commands
             };
+
+            // Log the settings being returned
+            logger.info(`Retrieved settings for guild ${guildId}: ${JSON.stringify(settings)}`);
 
             // Cache the settings
             this.settingsCache.set(guildId, settings);
@@ -65,13 +69,16 @@ class Guilds {
 
     static async setPrefix(guildId, prefix) {
         try {
+            // Clear cache
+            this.settingsCache.delete(guildId);
+            
             const [result] = await db.execute(
                 'UPDATE guilds SET prefix = ? WHERE guild_id = ?',
                 [prefix, guildId]
             );
             return result.affectedRows > 0;
         } catch (error) {
-            console.error('Error setting prefix:', error);
+            logger.error('Error setting prefix:', error);
             throw error;
         }
     }
@@ -85,7 +92,7 @@ class Guilds {
             // If no setting exists, command is enabled by default
             return rows.length === 0 ? true : rows[0].is_enabled === 1;
         } catch (error) {
-            console.error('Error checking command status:', error);
+            logger.error('Error checking command status:', error);
             throw error;
         }
     }
@@ -160,12 +167,23 @@ class Guilds {
 
     static async updateSettings(guildId, settings) {
         try {
+            // Clear cache first
+            this.settingsCache.delete(guildId);
+            
+            // Map frontend property names to database column names if needed
+            const dbSettings = {
+                prefix: settings.prefix,
+                welcome_channel_id: settings.welcomeChannel || settings.welcome_channel_id,
+                mod_log_channel_id: settings.modLogChannel || settings.mod_log_channel_id,
+                auto_role_id: settings.autoRole || settings.auto_role_id
+            };
+
             const validColumns = ['prefix', 'welcome_channel_id', 'mod_log_channel_id', 'auto_role_id'];
             const updates = [];
             const values = [];
 
-            for (const [key, value] of Object.entries(settings)) {
-                if (validColumns.includes(key)) {
+            for (const [key, value] of Object.entries(dbSettings)) {
+                if (validColumns.includes(key) && value !== undefined) {
                     updates.push(`${key} = ?`);
                     values.push(value);
                 }
@@ -173,16 +191,13 @@ class Guilds {
 
             if (updates.length === 0) {
                 logger.warn(`No valid settings to update for guild ${guildId}`);
-                return;
+                return false;
             }
 
             values.push(guildId);
 
             const query = `UPDATE guilds SET ${updates.join(', ')} WHERE guild_id = ?`;
             const [result] = await db.execute(query, values);
-            
-            // Invalidate cache
-            this.settingsCache.delete(guildId);
             
             // Verify the update
             const updatedSettings = await this.getGuild(guildId);
@@ -197,11 +212,14 @@ class Guilds {
 
     static async deleteGuild(guildId) {
         try {
+            // Clear cache
+            this.settingsCache.delete(guildId);
+            
             const [result] = await db.execute('DELETE FROM guilds WHERE guild_id = ?', [guildId]);
             const [commandResult] = await db.execute('DELETE FROM command_settings WHERE guild_id = ?', [guildId]);
-            return result.affectedRows > 0 && commandResult.affectedRows > 0;
+            return result.affectedRows > 0;
         } catch (error) {
-            console.error('Error deleting guild:', error);
+            logger.error('Error deleting guild:', error);
             throw error;
         }
     }
@@ -213,6 +231,10 @@ class Guilds {
                 [guildId, name, icon, ownerId, name, icon]
             );
             logger.info(`Guild ${name} (${guildId}) added or updated`);
+            
+            // Clear cache for this guild
+            this.settingsCache.delete(guildId);
+            
             return result.affectedRows > 0;
         } catch (error) {
             logger.error('Error adding guild:', error);
@@ -227,7 +249,7 @@ class Guilds {
             // Clear cache
             this.settingsCache.delete(guildId);
             logger.info(`Guild ${guildId} removed`);
-            return result.affectedRows > 0 && commandResult.affectedRows > 0;
+            return result.affectedRows > 0;
         } catch (error) {
             logger.error('Error removing guild:', error);
             throw error;
@@ -261,4 +283,4 @@ class Guilds {
     }
 }
 
-module.exports = { Guilds }; 
+module.exports = { Guilds };

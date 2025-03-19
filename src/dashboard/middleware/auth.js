@@ -1,4 +1,8 @@
 const fetch = require('node-fetch');
+const csrf = require('csurf');
+
+// CSRF protection middleware
+const csrfProtection = csrf({ cookie: false });
 
 // Middleware to check if user is authenticated
 const isAuthenticated = (req, res, next) => {
@@ -12,9 +16,16 @@ const isAuthenticated = (req, res, next) => {
 const hasGuildAccess = async (req, res, next) => {
     try {
         const guildId = req.params.guildId;
-        const userGuilds = req.user.guilds;
+        if (!req.user || !req.user.guilds) {
+            return res.status(403).render('error', {
+                user: req.user,
+                error: 'Authentication required'
+            });
+        }
         
+        const userGuilds = req.user.guilds;
         const hasAccess = userGuilds.some(guild => guild.id === guildId);
+        
         if (!hasAccess) {
             return res.status(403).render('error', {
                 user: req.user,
@@ -78,5 +89,6 @@ module.exports = {
     isAuthenticated,
     hasGuildAccess,
     rateLimit,
-    addCsrfToken
-}; 
+    addCsrfToken,
+    csrfProtection
+};

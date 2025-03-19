@@ -1,9 +1,3 @@
--- Drop existing tables if they exist
-DROP TABLE IF EXISTS command_settings;
-DROP TABLE IF EXISTS guild_settings;
-DROP TABLE IF EXISTS bot_guilds;
-DROP TABLE IF EXISTS guilds;
-
 -- Create guilds table
 CREATE TABLE IF NOT EXISTS guilds (
     guild_id VARCHAR(255) PRIMARY KEY,
@@ -46,4 +40,4 @@ CREATE TABLE IF NOT EXISTS sessions (
     data TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-); 
+);

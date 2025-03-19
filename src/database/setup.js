@@ -16,9 +16,13 @@ async function setupDatabase() {
             password: process.env.DB_PASSWORD,
         });
 
+        logger.info('Connected to MySQL server');
+
         // Create database if it doesn't exist
         await connection.query(`CREATE DATABASE IF NOT EXISTS ${process.env.DB_NAME || 'discord_bot'}`);
         await connection.query(`USE ${process.env.DB_NAME || 'discord_bot'}`);
+
+        logger.info('Database created or selected');
 
         // Read and execute schema.sql
         const schemaPath = path.join(__dirname, 'schema.sql');
@@ -36,7 +40,12 @@ async function setupDatabase() {
             logger.info('Executed SQL statement successfully');
         }
 
+        // Verify the tables were created
+        const [tables] = await connection.query('SHOW TABLES');
+        logger.info(`Tables created: ${tables.map(t => Object.values(t)[0]).join(', ')}`);
+
         logger.info('Database setup completed successfully');
+        return true;
     } catch (error) {
         logger.error('Error setting up database:', error);
         throw error;
@@ -47,17 +56,4 @@ async function setupDatabase() {
     }
 }
 
-// Run setup if this file is run directly
-if (require.main === module) {
-    setupDatabase()
-        .then(() => {
-            logger.info('Database setup completed');
-            process.exit(0);
-        })
-        .catch(error => {
-            logger.error('Database setup failed:', error);
-            process.exit(1);
-        });
-}
-
-module.exports = setupDatabase; 
+module.exports = setupDatabase;

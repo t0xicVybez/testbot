@@ -105,25 +105,36 @@
         </div>
     </div>
 
+    <!-- Toast container -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50"></div>
+
     <script>
     document.getElementById('settingsForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+        
+        // Show saving indicator
+        showToast('Saving settings...', 'info');
         
         const form = e.target;
         const formData = new FormData(form);
         const data = {};
         
+        // Extract standard form fields
+        data.prefix = formData.get('prefix');
+        data.welcomeChannel = formData.get('welcomeChannel');
+        data.modLogChannel = formData.get('modLogChannel');
+        data.autoRole = formData.get('autoRole');
+        data.commands = {};
+        
+        // Process command checkboxes
         for (const [key, value] of formData.entries()) {
             if (key.startsWith('commands[')) {
                 const matches = key.match(/commands\[(.*?)\]\[(.*?)\]/);
                 if (matches) {
                     const [, cmdName, prop] = matches;
-                    data.commands = data.commands || {};
                     data.commands[cmdName] = data.commands[cmdName] || {};
                     data.commands[cmdName][prop] = value === 'true';
                 }
-            } else {
-                data[key] = value;
             }
         }
 
@@ -141,6 +152,10 @@
             
             if (response.ok) {
                 showToast(result.message, 'success');
+                // Reload the page after a short delay to show updated settings
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
             } else {
                 throw new Error(result.error || 'Failed to save settings');
             }
@@ -149,17 +164,33 @@
         }
     });
 
-    function showToast(message, type) {
+    function showToast(message, type = 'success') {
+        // Remove existing toasts
+        const existingToasts = document.querySelectorAll('.toast');
+        existingToasts.forEach(toast => toast.remove());
+        
+        // Create new toast
         const toast = document.createElement('div');
-        toast.className = `fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg ${
-            type === 'success' ? 'bg-green-500' : 'bg-red-500'
+        toast.className = `toast px-6 py-3 rounded-lg shadow-lg mb-2 ${
+            type === 'success' ? 'bg-green-500' : 
+            type === 'error' ? 'bg-red-500' : 
+            type === 'info' ? 'bg-blue-500' : 'bg-yellow-500'
         } text-white`;
         toast.textContent = message;
-        document.body.appendChild(toast);
-        setTimeout(() => toast.remove(), 3000);
+        
+        // Add to container
+        const container = document.getElementById('toast-container');
+        container.appendChild(toast);
+        
+        // Auto remove after delay
+        setTimeout(() => {
+            toast.classList.add('opacity-0');
+            toast.style.transition = 'opacity 0.5s ease';
+            setTimeout(() => toast.remove(), 500);
+        }, 3000);
     }
     </script>
 
     <%- include('partials/footer') %>
 </body>
-</html> 
+</html>
