@@ -1,6 +1,4 @@
 const mysql = require('mysql2/promise');
-const fs = require('fs').promises;
-const path = require('path');
 const dotenv = require('dotenv');
 const logger = require('../utils/logger');
 
@@ -52,7 +50,7 @@ async function setupTicketsTables() {
                 priority ENUM('low', 'medium', 'high') DEFAULT 'medium',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                closed_at TIMESTAMP,
+                closed_at TIMESTAMP NULL,
                 closed_by VARCHAR(255),
                 UNIQUE KEY unique_ticket_channel (guild_id, channel_id),
                 UNIQUE KEY unique_ticket_number (guild_id, ticket_number),
@@ -63,7 +61,7 @@ async function setupTicketsTables() {
         await connection.execute(createTicketsTable);
         logger.info('Tickets table created successfully');
 
-        // Create ticket_responses table
+        // Create ticket_responses table for canned responses
         const createResponsesTable = `
             CREATE TABLE IF NOT EXISTS ticket_responses (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -81,7 +79,7 @@ async function setupTicketsTables() {
         await connection.execute(createResponsesTable);
         logger.info('Ticket responses table created successfully');
 
-        // Create ticket_panels table
+        // Create ticket_panels table for UI components
         const createPanelsTable = `
             CREATE TABLE IF NOT EXISTS ticket_panels (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -103,6 +101,15 @@ async function setupTicketsTables() {
         
         await connection.execute(createPanelsTable);
         logger.info('Ticket panels table created successfully');
+
+        // Make sure the tickets plugin is registered in the plugins table
+        const insertDefaultPlugin = `
+            INSERT IGNORE INTO plugins (guild_id, plugin_name, is_enabled)
+            SELECT guild_id, 'tickets', FALSE FROM guilds
+        `;
+        
+        await connection.execute(insertDefaultPlugin);
+        logger.info('Default tickets plugin entries created for existing guilds');
 
         logger.info('Tickets database setup completed successfully');
         return true;

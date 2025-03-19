@@ -159,6 +159,7 @@ router.get('/tickets/:guildId', isAuthenticated, hasGuildAccess, async (req, res
         let channels = [];
         let categories = [];
         let roles = [];
+        let panels = [];
         
         if (discordGuild) {
             // Get text channels
@@ -181,10 +182,13 @@ router.get('/tickets/:guildId', isAuthenticated, hasGuildAccess, async (req, res
         }
         
         // Get active tickets
-        const tickets = await Tickets.getActiveTickets(guildId);
+        const tickets = await Tickets.getActiveTickets(guildId) || [];
         
         // Get saved responses
-        const responses = await Tickets.getTicketResponses(guildId);
+        const responses = await Tickets.getTicketResponses(guildId) || [];
+        
+        // Get panels
+        panels = await Tickets.getPanels(guildId) || [];
         
         res.render('plugins/tickets', {
             user: req.user,
@@ -196,6 +200,7 @@ router.get('/tickets/:guildId', isAuthenticated, hasGuildAccess, async (req, res
             roles,
             tickets,
             responses,
+            panels,
             csrfToken: req.csrfToken()
         });
     } catch (error) {
@@ -250,6 +255,300 @@ router.post('/tickets/:guildId/settings', isAuthenticated, hasGuildAccess, async
         logger.error('Error updating ticket settings:', error);
         res.status(500).json({
             error: 'Failed to update ticket settings: ' + error.message
+        });
+    }
+});
+
+// Ticket panel API endpoints
+router.get('/tickets/:guildId/panels/:panelId', isAuthenticated, hasGuildAccess, async (req, res) => {
+    try {
+        const { panelId } = req.params;
+        
+        // Get panel by ID
+        const panel = await Tickets.getPanelById(panelId);
+        
+        if (panel) {
+            return res.json(panel);
+        } else {
+            return res.status(404).json({
+                error: 'Panel not found'
+            });
+        }
+    } catch (error) {
+        logger.error('Error getting panel:', error);
+        res.status(500).json({
+            error: 'Failed to get panel: ' + error.message
+        });
+    }
+});
+
+router.post('/tickets/:guildId/panels/create', isAuthenticated, hasGuildAccess, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const { name, channelId, title, description, buttonText, color } = req.body;
+        
+        logger.info(`Creating ticket panel for guild ${guildId}`, {
+            name,
+            channelId,
+            title,
+            description: description ? description.substring(0, 30) + '...' : null,
+            buttonText,
+            color
+        });
+        
+        // Validate required fields
+        if (!name || !channelId || !title || !description) {
+            return res.status(400).json({
+                error: 'Name, channel, title, and description are required'
+            });
+        }
+        
+        // Create embed message in the Discord channel
+        const client = req.app.get('client');
+        
+        // Make sure client exists
+        if (!client) {
+            logger.error('Discord client not found in app');
+            return res.status(500).json({ error: 'Discord client not available' });
+        }
+        
+        try {
+            const channel = await client.channels.fetch(channelId);
+            
+            if (!channel) {
+                return res.status(404).json({ error: 'Channel not found' });
+            }
+            
+            // Create the embed message
+            const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+            
+            const embed = new EmbedBuilder()
+                .setColor(color || '#3498DB')
+                .setTitle(title)
+                .setDescription(description)
+                .setFooter({ text: 'Click the button below to create a ticket' });
+            
+            const row = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('create_ticket')
+                        .setLabel(buttonText || 'Create Ticket')
+                        .setStyle(ButtonStyle.Primary)
+                        .setEmoji('🎫')
+                );
+            
+            const message = await channel.send({
+                embeds: [embed],
+                components: [row]
+            });
+            
+            // Save panel data to database
+            const panelId = await Tickets.createPanel(guildId, {
+                name,
+                channel_id: channelId,
+                message_id: message.id,
+                title,
+                description,
+                button_text: buttonText || 'Create Ticket',
+                color: color || '#3498DB',
+                created_by: req.user.id
+            });
+            
+            if (panelId) {
+                return res.json({
+                    success: true,
+                    message: 'Panel created successfully',
+                    id: panelId
+                });
+            } else {
+                throw new Error('Failed to create panel in database');
+            }
+        } catch (error) {
+            logger.error('Error creating Discord embed:', error);
+            return res.status(500).json({ 
+                error: 'Error communicating with Discord: ' + error.message
+            });
+        }
+    } catch (error) {
+        logger.error('Error creating ticket panel:', error);
+        return res.status(500).json({
+            error: 'Failed to create panel: ' + error.message
+        });
+    }
+});
+
+router.post('/tickets/:guildId/panels/update/:panelId', isAuthenticated, hasGuildAccess, async (req, res) => {
+    try {
+        const { guildId, panelId } = req.params;
+        const { name, channelId, title, description, buttonText, color } = req.body;
+        
+        logger.info(`Updating ticket panel ${panelId} for guild ${guildId}`);
+        
+        // Validate required fields
+        if (!name || !title || !description) {
+            return res.status(400).json({
+                error: 'Name, title, and description are required'
+            });
+        }
+        
+        // Get existing panel data
+        const panel = await Tickets.getPanelById(panelId);
+        if (!panel) {
+            return res.status(404).json({ error: 'Panel not found' });
+        }
+        
+        // Update the Discord message if channel has changed
+        let messageId = panel.message_id;
+        const client = req.app.get('client');
+        
+        if (channelId !== panel.channel_id) {
+            // Delete old message
+            try {
+                const oldChannel = await client.channels.fetch(panel.channel_id);
+                if (oldChannel) {
+                    const oldMessage = await oldChannel.messages.fetch(panel.message_id);
+                    if (oldMessage) {
+                        await oldMessage.delete();
+                    }
+                }
+            } catch (error) {
+                logger.warn(`Could not delete old panel message: ${error.message}`);
+            }
+            
+            // Create new message in new channel
+            const newChannel = await client.channels.fetch(channelId);
+            if (!newChannel) {
+                return res.status(404).json({ error: 'New channel not found' });
+            }
+            
+            const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+            
+            const embed = new EmbedBuilder()
+                .setColor(color || '#3498DB')
+                .setTitle(title)
+                .setDescription(description)
+                .setFooter({ text: 'Click the button below to create a ticket' });
+            
+            const row = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('create_ticket')
+                        .setLabel(buttonText || 'Create Ticket')
+                        .setStyle(ButtonStyle.Primary)
+                        .setEmoji('🎫')
+                );
+            
+            const newMessage = await newChannel.send({
+                embeds: [embed],
+                components: [row]
+            });
+            
+            messageId = newMessage.id;
+        } else {
+            // Update existing message
+            try {
+                const channel = await client.channels.fetch(panel.channel_id);
+                if (channel) {
+                    const message = await channel.messages.fetch(panel.message_id);
+                    if (message) {
+                        const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+                        
+                        const embed = new EmbedBuilder()
+                            .setColor(color || '#3498DB')
+                            .setTitle(title)
+                            .setDescription(description)
+                            .setFooter({ text: 'Click the button below to create a ticket' });
+                        
+                        const row = new ActionRowBuilder()
+                            .addComponents(
+                                new ButtonBuilder()
+                                    .setCustomId('create_ticket')
+                                    .setLabel(buttonText || 'Create Ticket')
+                                    .setStyle(ButtonStyle.Primary)
+                                    .setEmoji('🎫')
+                            );
+                        
+                        await message.edit({
+                            embeds: [embed],
+                            components: [row]
+                        });
+                    }
+                }
+            } catch (error) {
+                logger.warn(`Could not update panel message: ${error.message}`);
+                return res.status(500).json({
+                    error: 'Failed to update panel message: ' + error.message
+                });
+            }
+        }
+        
+        // Update panel in database
+        const success = await Tickets.updatePanel(panelId, {
+            name,
+            title,
+            description,
+            button_text: buttonText || 'Create Ticket',
+            color: color || '#3498DB',
+            message_id: messageId
+        });
+        
+        if (success) {
+            return res.json({
+                success: true,
+                message: 'Panel updated successfully'
+            });
+        } else {
+            throw new Error('Failed to update panel');
+        }
+    } catch (error) {
+        logger.error('Error updating ticket panel:', error);
+        res.status(500).json({
+            error: 'Failed to update panel: ' + error.message
+        });
+    }
+});
+
+router.post('/tickets/:guildId/panels/delete/:panelId', isAuthenticated, hasGuildAccess, async (req, res) => {
+    try {
+        const { guildId, panelId } = req.params;
+        
+        logger.info(`Deleting ticket panel ${panelId} for guild ${guildId}`);
+        
+        // Get panel data
+        const panel = await Tickets.getPanelById(panelId);
+        if (!panel) {
+            return res.status(404).json({ error: 'Panel not found' });
+        }
+        
+        // Delete Discord message
+        try {
+            const client = req.app.get('client');
+            const channel = await client.channels.fetch(panel.channel_id);
+            if (channel) {
+                const message = await channel.messages.fetch(panel.message_id);
+                if (message) {
+                    await message.delete();
+                }
+            }
+        } catch (error) {
+            logger.warn(`Could not delete panel message: ${error.message}`);
+        }
+        
+        // Delete panel from database
+        const success = await Tickets.deletePanel(panelId);
+        
+        if (success) {
+            return res.json({
+                success: true,
+                message: 'Panel deleted successfully'
+            });
+        } else {
+            throw new Error('Failed to delete panel');
+        }
+    } catch (error) {
+        logger.error('Error deleting ticket panel:', error);
+        res.status(500).json({
+            error: 'Failed to delete panel: ' + error.message
         });
     }
 });

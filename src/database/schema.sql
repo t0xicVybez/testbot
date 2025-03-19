@@ -71,3 +71,20 @@ CREATE TABLE IF NOT EXISTS tags (
     UNIQUE KEY unique_guild_tag_name (guild_id, name),
     FOREIGN KEY (guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
 );
+-- Create ticket_panels table
+CREATE TABLE IF NOT EXISTS ticket_panels (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    guild_id VARCHAR(255) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    channel_id VARCHAR(255) NOT NULL,
+    message_id VARCHAR(255) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT NOT NULL,
+    button_text VARCHAR(80) DEFAULT 'Create Ticket',
+    color VARCHAR(10) DEFAULT '#3498DB',
+    created_by VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_panel_message (guild_id, channel_id, message_id),
+    FOREIGN KEY (guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
+);
