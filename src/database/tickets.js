@@ -197,13 +197,18 @@ class Tickets {
     // Ticket Management
     static async createTicket(guildId, data) {
         try {
-            // Get the next ticket number
-            const [maxTicketRows] = await db.execute(
-                'SELECT MAX(ticket_number) as max_number FROM tickets WHERE guild_id = ?',
-                [guildId]
-            );
+            // Ensure we have a ticket number explicitly set
+            let { ticket_number } = data;
             
-            const ticketNumber = maxTicketRows[0].max_number ? maxTicketRows[0].max_number + 1 : 1;
+            // If no ticket number was provided, get the next one
+            if (!ticket_number) {
+                const [maxTicketRows] = await db.execute(
+                    'SELECT MAX(ticket_number) as max_number FROM tickets WHERE guild_id = ?',
+                    [guildId]
+                );
+                
+                ticket_number = maxTicketRows[0].max_number ? maxTicketRows[0].max_number + 1 : 1;
+            }
             
             const query = `
                 INSERT INTO tickets (
@@ -220,14 +225,14 @@ class Tickets {
                 guildId,
                 data.channel_id,
                 data.creator_id,
-                ticketNumber,
-                data.subject || `Support Ticket #${ticketNumber}`,
+                ticket_number,
+                data.subject || `Support Ticket #${ticket_number}`,
                 'open'
             ]);
             
             return {
                 id: result.insertId,
-                ticket_number: ticketNumber
+                ticket_number
             };
         } catch (error) {
             logger.error('Error creating ticket:', error);
@@ -539,6 +544,82 @@ class Tickets {
             return result.affectedRows > 0;
         } catch (error) {
             logger.error('Error updating ticket panel:', error);
+            throw error;
+        }
+    }
+
+    static async saveTranscriptLink(guildId, ticketId, ticketNumber, createdBy, transcriptUrl) {
+        try {
+            const query = `
+                INSERT INTO ticket_transcripts (
+                    guild_id,
+                    ticket_id,
+                    ticket_number,
+                    created_by,
+                    transcript_url
+                ) VALUES (?, ?, ?, ?, ?)
+            `;
+            
+            const [result] = await db.execute(query, [
+                guildId,
+                ticketId,
+                ticketNumber,
+                createdBy,
+                transcriptUrl
+            ]);
+            
+            return result.insertId;
+        } catch (error) {
+            logger.error('Error saving transcript link:', error);
+            throw error;
+        }
+    }
+
+    static async getGuildTranscripts(guildId) {
+        try {
+            const query = `
+                SELECT * FROM ticket_transcripts
+                WHERE guild_id = ?
+                ORDER BY created_at DESC
+            `;
+            
+            const [rows] = await db.execute(query, [guildId]);
+            return rows;
+        } catch (error) {
+            logger.error('Error getting guild transcripts:', error);
+            throw error;
+        }
+    }
+    
+    static async getTicketTranscripts(guildId, ticketNumber) {
+        try {
+            const query = `
+                SELECT * FROM ticket_transcripts
+                WHERE guild_id = ? AND ticket_number = ?
+                ORDER BY created_at DESC
+            `;
+            
+            const [rows] = await db.execute(query, [guildId, ticketNumber]);
+            return rows;
+        } catch (error) {
+            logger.error('Error getting ticket transcripts:', error);
+            throw error;
+        }
+    }
+    
+    static async getLatestTicketTranscript(guildId, ticketNumber) {
+        try {
+            const query = `
+                SELECT * FROM ticket_transcripts
+                WHERE guild_id = ? AND ticket_number = ?
+                ORDER BY created_at DESC
+                LIMIT 1
+            `;
+            
+            const [rows] = await db.execute(query, [guildId, ticketNumber]);
+            return rows.length > 0 ? rows[0] : null;
+        } catch (error) {
+            logger.error('Error getting latest ticket transcript:', error);
             throw error;
         }
     }

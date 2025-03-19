@@ -102,6 +102,23 @@ async function setupTicketsTables() {
         await connection.execute(createPanelsTable);
         logger.info('Ticket panels table created successfully');
 
+        // Create ticket_transcripts table for storing transcript links
+        const createTranscriptsTable = `
+            CREATE TABLE IF NOT EXISTS ticket_transcripts (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                guild_id VARCHAR(255) NOT NULL,
+                ticket_id INT NOT NULL,
+                ticket_number INT NOT NULL,
+                created_by VARCHAR(255) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                transcript_url VARCHAR(1000),
+                FOREIGN KEY (guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
+            )
+        `;
+        
+        await connection.execute(createTranscriptsTable);
+        logger.info('Ticket transcripts table created successfully');
+
         // Make sure the tickets plugin is registered in the plugins table
         const insertDefaultPlugin = `
             INSERT IGNORE INTO plugins (guild_id, plugin_name, is_enabled)

@@ -4,12 +4,7 @@ const logger = require('../../utils/logger');
 
 module.exports = (client) => {
     try {
-        // Load interaction handler
-        const interactionHandler = require('./interactionHandler');
-        client.on(interactionHandler.name, (...args) => interactionHandler.execute(...args));
-        logger.info('Loaded interaction handler');
-
-        // Load other event files
+        // Load event files
         const eventsPath = path.join(__dirname, '../events');
         const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
 
@@ -28,4 +23,4 @@ module.exports = (client) => {
     } catch (error) {
         logger.error('Error loading events:', error);
     }
-}; 
+};
