@@ -774,4 +774,156 @@ router.post('/tags/:guildId/delete/:tagName', isAuthenticated, hasGuildAccess, a
     }
 });
 
+// Ticket Categories Routes
+router.get('/tickets/:guildId/categories', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const guild = await getGuild(guildId);
+        
+        if (!guild) {
+            return res.redirect('/dashboard');
+        }
+        
+        const categories = await Tickets.getCategories(guildId);
+        const settings = await Tickets.getTicketSettings(guildId);
+        
+        // Get Discord categories and roles for the form
+        const discordGuild = await req.client.guilds.fetch(guildId);
+        const discordCategories = discordGuild.channels.cache
+            .filter(c => c.type === 'GUILD_CATEGORY')
+            .map(c => ({ id: c.id, name: c.name }));
+        
+        const roles = discordGuild.roles.cache
+            .map(r => ({ id: r.id, name: r.name }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+        
+        res.render('plugins/tickets/categories', {
+            guild,
+            categories,
+            settings,
+            discordCategories,
+            roles,
+            csrfToken: req.csrfToken()
+        });
+    } catch (error) {
+        console.error('Error loading ticket categories:', error);
+        res.status(500).send('Error loading ticket categories');
+    }
+});
+
+router.post('/tickets/:guildId/categories', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const {
+            name,
+            description,
+            category_id,
+            support_role_id,
+            welcome_message,
+            ticket_name_format,
+            feedback_enabled,
+            color
+        } = req.body;
+        
+        const categoryId = await Tickets.createCategory(guildId, {
+            name,
+            description,
+            category_id,
+            support_role_id,
+            welcome_message,
+            ticket_name_format,
+            feedback_enabled: feedback_enabled === 'true',
+            color
+        });
+        
+        res.json({ success: true, categoryId });
+    } catch (error) {
+        console.error('Error creating ticket category:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+router.put('/tickets/:guildId/categories/:categoryId', requireAuth, async (req, res) => {
+    try {
+        const { categoryId } = req.params;
+        const {
+            name,
+            description,
+            category_id,
+            support_role_id,
+            welcome_message,
+            ticket_name_format,
+            feedback_enabled,
+            color
+        } = req.body;
+        
+        await Tickets.updateCategory(categoryId, {
+            name,
+            description,
+            category_id,
+            support_role_id,
+            welcome_message,
+            ticket_name_format,
+            feedback_enabled: feedback_enabled === 'true',
+            color
+        });
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error updating ticket category:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+router.delete('/tickets/:guildId/categories/:categoryId', requireAuth, async (req, res) => {
+    try {
+        const { categoryId } = req.params;
+        await Tickets.deleteCategory(categoryId);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting ticket category:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Feedback Routes
+router.get('/tickets/:guildId/feedback/stats', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const { categoryId } = req.query;
+        
+        const stats = await Tickets.getFeedbackStats(guildId, categoryId || null);
+        res.json(stats);
+    } catch (error) {
+        console.error('Error getting feedback stats:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+router.get('/tickets/:guildId/feedback/recent', requireAuth, async (req, res) => {
+    try {
+        const { guildId } = req.params;
+        const { categoryId } = req.query;
+        
+        const feedback = await Tickets.getRecentFeedback(guildId, categoryId || null);
+        res.json(feedback);
+    } catch (error) {
+        console.error('Error getting recent feedback:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+router.post('/tickets/:guildId/feedback/:ticketId', requireAuth, async (req, res) => {
+    try {
+        const { guildId, ticketId } = req.params;
+        const { rating, comments } = req.body;
+        
+        await Tickets.createFeedback(guildId, ticketId, req.user.id, rating, comments);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error submitting feedback:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 module.exports = router;

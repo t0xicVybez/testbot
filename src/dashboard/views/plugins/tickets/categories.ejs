@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ticket Categories - Discord Bot</title>
+    <link href="/css/output.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex flex-col">
+    <%- include('../../../partials/header') %>
+
+    <main class="flex-grow container mx-auto px-4 py-8">
+        <div class="flex items-center justify-between mb-8">
+            <div>
+                <h1 class="text-3xl font-bold">Ticket Categories</h1>
+                <p class="text-gray-400">Server: <%= guild.name %></p>
+            </div>
+            <div class="space-x-2">
+                <a href="/dashboard/plugins/tickets/<%= guild.id %>" class="text-gray-400 hover:text-white transition-colors">
+                    <i class="fas fa-arrow-left mr-2"></i>
+                    Back to Tickets
+                </a>
+            </div>
+        </div>
+
+        <!-- Categories Table -->
+        <div class="bg-gray-800 rounded-lg p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold">Manage Categories</h3>
+                <button onclick="showCategoryModal('create')" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors">
+                    <i class="fas fa-plus mr-2"></i>Create Category
+                </button>
+            </div>
+            
+            <p class="text-gray-300 mb-4">
+                Create and manage different ticket categories. Each category can have its own settings, including Discord category, support role, and feedback options.
+            </p>
+            
+            <% if (categories && categories.length > 0) { %>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="bg-gray-700">
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Name</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Discord Category</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Support Role</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Feedback</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-700">
+                            <% categories.forEach(category => { %>
+                                <tr class="hover:bg-gray-700">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                        <div class="flex items-center">
+                                            <div class="h-4 w-4 rounded mr-2" style="background-color: <%= category.color || '#3498DB' %>"></div>
+                                            <%= category.name %>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                        <% const discordCategory = discordCategories.find(c => c.id === category.category_id); %>
+                                        <%= discordCategory ? discordCategory.name : 'Not set' %>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                        <% const role = roles.find(r => r.id === category.support_role_id); %>
+                                        <%= role ? role.name : 'Not set' %>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                        <span class="px-2 py-1 rounded-full text-xs font-medium
+                                            <%= category.feedback_enabled ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' %>">
+                                            <%= category.feedback_enabled ? 'Enabled' : 'Disabled' %>
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                        <div class="flex space-x-2">
+                                            <button onclick="showCategoryModal('edit', <%= JSON.stringify(category) %>)" 
+                                                   class="text-yellow-400 hover:text-yellow-300 transition-colors">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button onclick="confirmDeleteCategory(<%= category.id %>, '<%= category.name %>')" 
+                                                   class="text-red-400 hover:text-red-300 transition-colors">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <% }); %>
+                        </tbody>
+                    </table>
+                </div>
+            <% } else { %>
+                <div class="text-center py-8">
+                    <p class="text-gray-400 mb-4">No ticket categories have been created yet.</p>
+                    <button onclick="showCategoryModal('create')" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+                        <i class="fas fa-plus mr-2"></i>Create Your First Category
+                    </button>
+                </div>
+            <% } %>
+        </div>
+
+        <!-- Feedback Stats -->
+        <div class="bg-gray-800 rounded-lg p-6 mt-8">
+            <h3 class="text-xl font-semibold mb-4">Feedback Analytics</h3>
+            
+            <% if (categories && categories.length > 0) { %>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Select Category</label>
+                    <select id="feedback-category-select" onchange="loadFeedbackStats()" class="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white">
+                        <option value="">All Categories</option>
+                        <% categories.filter(c => c.feedback_enabled).forEach(category => { %>
+                            <option value="<%= category.id %>"><%= category.name %></option>
+                        <% }); %>
+                    </select>
+                </div>
+                
+                <div id="feedback-stats-container" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-gray-700 rounded-lg p-4 flex flex-col items-center justify-center text-center">
+                        <div class="text-3xl font-bold text-blue-400 mb-2" id="stat-avg-rating">-</div>
+                        <div class="text-gray-300">Average Rating</div>
+                    </div>
+                    <div class="bg-gray-700 rounded-lg p-4 flex flex-col items-center justify-center text-center">
+                        <div class="text-3xl font-bold text-green-400 mb-2" id="stat-total-feedback">-</div>
+                        <div class="text-gray-300">Total Feedback</div>
+                    </div>
+                    <div class="bg-gray-700 rounded-lg p-4 flex flex-col items-center justify-center text-center">
+                        <div class="text-3xl font-bold text-purple-400 mb-2" id="stat-5-stars">-</div>
+                        <div class="text-gray-300">5-Star Ratings</div>
+                    </div>
+                    <div class="bg-gray-700 rounded-lg p-4 flex flex-col items-center justify-center text-center">
+                        <div class="text-3xl font-bold text-yellow-400 mb-2" id="stat-satisfaction">-</div>
+                        <div class="text-gray-300">Satisfaction Rate</div>
+                    </div>
+                </div>
+                
+                <div id="rating-distribution" class="mb-4">
+                    <h4 class="text-lg font-semibold mb-2">Rating Distribution</h4>
+                    <div class="space-y-3">
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <span>5 Stars</span>
+                                <span id="rating-5-percent">0%</span>
+                            </div>
+                            <div class="w-full bg-gray-700 rounded-full h-2.5">
+                                <div id="rating-5-bar" class="bg-green-500 h-2.5 rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <span>4 Stars</span>
+                                <span id="rating-4-percent">0%</span>
+                            </div>
+                            <div class="w-full bg-gray-700 rounded-full h-2.5">
+                                <div id="rating-4-bar" class="bg-blue-500 h-2.5 rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <span>3 Stars</span>
+                                <span id="rating-3-percent">0%</span>
+                            </div>
+                            <div class="w-full bg-gray-700 rounded-full h-2.5">
+                                <div id="rating-3-bar" class="bg-yellow-500 h-2.5 rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <span>2 Stars</span>
+                                <span id="rating-2-percent">0%</span>
+                            </div>
+                            <div class="w-full bg-gray-700 rounded-full h-2.5">
+                                <div id="rating-2-bar" class="bg-orange-500 h-2.5 rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <span>1 Star</span>
+                                <span id="rating-1-percent">0%</span>
+                            </div>
+                            <div class="w-full bg-gray-700 rounded-full h-2.5">
+                                <div id="rating-1-bar" class="bg-red-500 h-2.5 rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="recent-feedback-container">
+                    <h4 class="text-lg font-semibold mb-2">Recent Feedback</h4>
+                    <div id="recent-feedback" class="space-y-4">
+                        <div class="text-center text-gray-400 py-4">
+                            <i class="fas fa-spinner fa-spin text-2xl"></i>
+                            <p class="mt-2">Loading recent feedback...</p>
+                        </div>
+                    </div>
+                </div>
+            <% } else { %>
+                <div class="text-center py-8">
+                    <p class="text-gray-400 mb-4">Create a ticket category with feedback enabled to see analytics here.</p>
+                </div>
+            <% } %>
+        </div>
+    </main>
+
+    <!-- Category Modal -->
+    <div id="category-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-gray-800 rounded-lg p-6 w-full max-w-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold" id="category-modal-title">Create Ticket Category</h3>
+                <button onclick="hideCategoryModal()" class="text-gray-400 hover:text-white">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="category-form" onsubmit="handleCategorySubmit(event)">
+                <input type="hidden" id="category-action" value="create">
+                <input type="hidden" id="category-id" value="">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label for="category-name" class="block text-sm font-medium text-gray-300 mb-2">Category Name <span class="text-red-500">*</span></label>
+                        <input type="text" id="category-name" name="name" required
+                               class="w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <p class="mt-1 text-xs text-gray-400">A unique name for this category</p>
+                    </div>
+                    
+                    <div>
+                        <label for="category-color" class="block text-sm font-medium text-gray-300 mb-2">Color</label>
+                        <div class="flex">
+                            <input type="color" id="category-color" name="color" value="#3498DB"
+                                   class="h-10 bg-gray-700 border border-gray-600 rounded-md shadow-sm">
+                            <input type="text" id="category-color-text" value="#3498DB"
+                                   class="w-full ml-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                   oninput="updateColorPicker(this.value)">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label for="category-description" class="block text-sm font-medium text-gray-300 mb-2">Description</label>
+                    <textarea id="category-description" name="description" rows="2"
+                              class="w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                    <p class="mt-1 text-xs text-gray-400">Brief description of this ticket category</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label for="discord-category" class="block text-sm font-medium text-gray-300 mb-2">Discord Category <span class="text-red-500">*</span></label>
+                        <select id="discord-category" name="discordCategory" required
+                               class="w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">Select a category</option>
+                            <% discordCategories.forEach(category => { %>
+                                <option value="<%= category.id %>"><%= category.name %></option>
+                            <% }); %>
+                        </select>
+                        <p class="mt-1 text-xs text-gray-400">Discord category where ticket channels will be created</p>
+                    </div>
+                    
+                    <div>
+                        <label for="support-role" class="block text-sm font-medium text-gray-300 mb-2">Support Role <span class="text-red-500">*</span></label>
+                        <select id="support-role" name="supportRole" required
+                               class="w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">Select a role</option>
+                            <% roles.forEach(role => { %>
+                                <option value="<%= role.id %>"><%= role.name %></option>
+                            <% }); %>
+                        </select>
+                        <p class="mt-1 text-xs text-gray-400">Role that can access and manage these tickets</p>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label for="ticket-name-format" class="block text-sm font-medium text-gray-300 mb-2">Ticket Name Format</label>
+                    <input type="text" id="ticket-name-format" name="ticketNameFormat" value="ticket-{category}-{number}"
+                           class="w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <p class="mt-1 text-xs text-gray-400">Use {category} for category name and {number} for ticket number</p>
+                </div>
+
+                <div class="mb-4">
+                    <label for="welcome-message" class="block text-sm font-medium text-gray-300 mb-2">Welcome Message</label>
+                    <textarea id="welcome-message" name="welcomeMessage" rows="3"
+                              class="w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">Thank you for creating a support ticket. Please describe your issue, and a staff member will assist you shortly.</textarea>
+                    <p class="mt-1 text-xs text-gray-400">Message shown when a ticket is created</p>
+                </div>
+
+                <div class="mb-6">
+                    <label class="flex items-center">
+                        <input type="checkbox" id="feedback-enabled" name="feedbackEnabled" checked
+                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-600 rounded bg-gray-700">
+                        <span class="ml-2 text-gray-300">Enable feedback for this category</span>
+                    </label>
+                    <p class="mt-1 text-xs text-gray-400 ml-6">Allow users to rate their support experience when tickets are closed</p>
+                </div>
+
+                <div class="flex justify-end space-x-3">
+                    <button type="button" onclick="hideCategoryModal()" 
+                            class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit" 
+                            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors">
+                        <span id="category-submit-text">Create Category</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Category Confirmation Modal -->
+    <div id="delete-category-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-gray-800 rounded-lg p-6 w-full max-w-md">
+            <div class="mb-4">
+                <h3 class="text-xl font-bold text-white">Delete Category</h3>
+                <p class="text-gray-300 mt-2">Are you sure you want to delete the category "<span id="delete-category-name"></span>"? This will affect all associated tickets and panels.</p>
+            </div>
+            <div class="flex justify-end space-x-3">
+                <button onclick="hideDeleteCategoryModal()" 
+                        class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors">
+                    Cancel
+                </button>
+                <button onclick="deleteCategory()" 
+                        class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded transition-colors">
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast container -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50"></div>
+
+    <script>
+        // Category modal functionality
+        function showCategoryModal(action, category = null) {
+            document.getElementById('category-modal').classList.remove('hidden');
+            document.getElementById('category-action').value = action;
+            document.getElementById('category-form').reset();
+            
+            if (action === 'create') {
+                document.getElementById('category-modal-title').textContent = 'Create Ticket Category';
+                document.getElementById('category-submit-text').textContent = 'Create Category';
+                document.getElementById('category-id').value = '';
+                
+                // Set default values
+                document.getElementById('category-color').value = '#3498DB';
+                document.getElementById('category-color-text').value = '#3498DB';
+                document.getElementById('welcome-message').value = 'Thank you for creating a support ticket. Please describe your issue, and a staff member will assist you shortly.';
+                document.getElementById('ticket-name-format').value = 'ticket-{category}-{number}';
+                document.getElementById('feedback-enabled').checked = true;
+            } else if (action === 'edit' && category) {
+                document.getElementById('category-modal-title').textContent = 'Edit Ticket Category';
+                document.getElementById('category-submit-text').textContent = 'Update Category';
+                document.getElementById('category-id').value = category.id;
+                
+                // Fill form with category data
+                document.getElementById('category-name').value = category.name;
+                document.getElementById('category-description').value = category.description || '';
+                document.getElementById('discord-category').value = category.category_id;
+                document.getElementById('support-role').value = category.support_role_id;
+                document.getElementById('welcome-message').value = category.welcome_message || 'Thank you for creating a support ticket. Please describe your issue, and a staff member will assist you shortly.';
+                document.getElementById('ticket-name-format').value = category.ticket_name_format || 'ticket-{category}-{number}';
+                document.getElementById('feedback-enabled').checked = category.feedback_enabled === 1;
+                document.getElementById('category-color').value = category.color || '#3498DB';
+                document.getElementById('category-color-text').value = category.color || '#3498DB';
+            }
+        }
+        
+        function hideCategoryModal() {
+            document.getElementById('category-modal').classList.add('hidden');
+        }
+        
+        function confirmDeleteCategory(categoryId, categoryName) {
+            document.getElementById('delete-category-modal').classList.remove('hidden');
+            document.getElementById('delete-category-name').textContent = categoryName;
+            document.getElementById('delete-category-modal').dataset.categoryId = categoryId;
+        }
+        
+        function hideDeleteCategoryModal() {
+            document.getElementById('delete-category-modal').classList.add('hidden');
+        }
+        
+        function updateColorPicker(value) {
+            // Validate hex color code
+            if (/^#[0-9A-F]{6}$/i.test(value)) {
+                document.getElementById('category-color').value = value;
+            }
+        }
+        
+        // Handle category form submission
+        async function handleCategorySubmit(event) {
+            event.preventDefault();
+            
+            const action = document.getElementById('category-action').value;
+            const categoryId = document.getElementById('category-id').value;
+            
+            const formData = {
+                name: document.getElementById('category-name').value,
+                description: document.getElementById('category-description').value,
+                categoryId: document.getElementById('discord-category').value,
+                supportRoleId: document.getElementById('support-role').value,
+                welcomeMessage: document.getElementById('welcome-message').value,
+                ticketNameFormat: document.getElementById('ticket-name-format').value,
+                feedbackEnabled: document.getElementById('feedback-enabled').checked,
+                color: document.getElementById('category-color').value
+            };
+            
+            try {
+                let url;
+                
+                if (action === 'create') {
+                    url = `/dashboard/plugins/tickets/<%= guild.id %>/categories/create`;
+                } else if (action === 'edit') {
+                    url = `/dashboard/plugins/tickets/<%= guild.id %>/categories/update/${categoryId}`;
+                }
+                
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'CSRF-Token': '<%= csrfToken %>'
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showToast(result.message, 'success');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    throw new Error(result.error || `Failed to ${action} category`);
+                }
+                
+                hideCategoryModal();
+            } catch (error) {
+                console.error('Error:', error);
+                showToast(error.message, 'error');
+            }
+        }
+        
+        // Delete category
+        async function deleteCategory() {
+            try {
+                const categoryId = document.getElementById('delete-category-modal').dataset.categoryId;
+                
+                const response = await fetch(`/dashboard/plugins/tickets/<%= guild.id %>/categories/delete/${categoryId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'CSRF-Token': '<%= csrfToken %>'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showToast(result.message, 'success');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    throw new Error(result.error || 'Failed to delete category');
+                }
+                
+                hideDeleteCategoryModal();
+            } catch (error) {
+                console.error('Error:', error);
+                showToast(error.message, 'error');
+            }
+        }
+        
+        // Set default category
+        async function setDefaultCategory(categoryId) {
+            try {
+                const response = await fetch(`/dashboard/plugins/tickets/<%= guild.id %>/categories/setDefault/${categoryId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'CSRF-Token': '<%= csrfToken %>'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showToast(result.message, 'success');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    throw new Error(result.error || 'Failed to set default category');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showToast(error.message, 'error');
+            }
+        }
+        
+        // Feedback stats functionality
+        async function loadFeedbackStats() {
+            const categoryId = document.getElementById('feedback-category-select').value;
+            
+            try {
+                // Get stats
+                const statsResponse = await fetch(`/dashboard/plugins/tickets/<%= guild.id %>/feedback/stats?categoryId=${categoryId}`, {
+                    headers: {
+                        'CSRF-Token': '<%= csrfToken %>'
+                    }
+                });
+                
+                if (!statsResponse.ok) {
+                    throw new Error('Failed to load feedback stats');
+                }
+                
+                const stats = await statsResponse.json();
+                updateFeedbackStats(stats);
+                
+                // Get recent feedback
+                const feedbackResponse = await fetch(`/dashboard/plugins/tickets/<%= guild.id %>/feedback/recent?limit=5`, {
+                    headers: {
+                        'CSRF-Token': '<%= csrfToken %>'
+                    }
+                });
+                
+                if (!feedbackResponse.ok) {
+                    throw new Error('Failed to load recent feedback');
+                }
+                
+                const feedback = await feedbackResponse.json();
+                updateRecentFeedback(feedback);
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showToast(error.message, 'error');
+            }
+        }
+        
+        function updateFeedbackStats(stats) {
+            // Average rating
+            document.getElementById('stat-avg-rating').textContent = stats.average_rating ? stats.average_rating.toFixed(1) : '-';
+            
+            // Total feedback
+            document.getElementById('stat-total-feedback').textContent = stats.total_feedback || '0';
+            
+            // 5-star ratings
+            document.getElementById('stat-5-stars').textContent = stats.rating_5 || '0';
+            
+            // Satisfaction rate (4-5 star ratings as percentage of total)
+            const satisfactionRate = stats.total_feedback ? 
+                Math.round(((stats.rating_4 || 0) + (stats.rating_5 || 0)) / stats.total_feedback * 100) : 0;
+            document.getElementById('stat-satisfaction').textContent = `${satisfactionRate}%`;
+            
+            // Rating distribution
+            const total = stats.total_feedback || 1; // Avoid division by zero
+            
+            // 5-star
+            const percent5 = Math.round((stats.rating_5 || 0) / total * 100);
+            document.getElementById('rating-5-percent').textContent = `${percent5}%`;
+            document.getElementById('rating-5-bar').style.width = `${percent5}%`;
+            
+            // 4-star
+            const percent4 = Math.round((stats.rating_4 || 0) / total * 100);
+            document.getElementById('rating-4-percent').textContent = `${percent4}%`;
+            document.getElementById('rating-4-bar').style.width = `${percent4}%`;
+            
+            // 3-star
+            const percent3 = Math.round((stats.rating_3 || 0) / total * 100);
+            document.getElementById('rating-3-percent').textContent = `${percent3}%`;
+            document.getElementById('rating-3-bar').style.width = `${percent3}%`;
+            
+            // 2-star
+            const percent2 = Math.round((stats.rating_2 || 0) / total * 100);
+            document.getElementById('rating-2-percent').textContent = `${percent2}%`;
+            document.getElementById('rating-2-bar').style.width = `${percent2}%`;
+            
+            // 1-star
+            const percent1 = Math.round((stats.rating_1 || 0) / total * 100);
+            document.getElementById('rating-1-percent').textContent = `${percent1}%`;
+            document.getElementById('rating-1-bar').style.width = `${percent1}%`;
+        }
+        
+        function updateRecentFeedback(feedback) {
+            const container = document.getElementById('recent-feedback');
+            
+            if (!feedback || feedback.length === 0) {
+                container.innerHTML = '<p class="text-center text-gray-400 py-4">No feedback available yet.</p>';
+                return;
+            }
+            
+            let html = '';
+            
+            feedback.forEach(item => {
+                const ratingStars = Array(5).fill('☆').map((star, i) => 
+                    i < item.rating ? '★' : '☆'
+                ).join('');
+                
+                html += `
+                <div class="bg-gray-700 rounded-lg p-4">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <div class="text-yellow-400 text-lg">${ratingStars}</div>
+                            <div class="text-sm text-gray-300 mt-1">Ticket #${item.ticket_number}</div>
+                        </div>
+                        <div class="text-xs text-gray-400">
+                            ${new Date(item.created_at).toLocaleDateString()}
+                        </div>
+                    </div>
+                    ${item.comments ? `<p class="mt-2 text-sm">${item.comments}</p>` : ''}
+                </div>`;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `${type === 'success' ? 'bg-green-500' : 'bg-red-500'} text-white px-6 py-3 rounded shadow-lg mb-2`;
+            toast.textContent = message;
+            
+            const container = document.getElementById('toast-container');
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'transition-opacity');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+        
+        // Load feedback stats on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            <% if (categories && categories.length > 0 && categories.some(c => c.feedback_enabled)) { %>
+                loadFeedbackStats();
+            <% } %>
+        });
+    </script>
+
+    <%- include('../../partials/footer') %>
+</body>
+</html>

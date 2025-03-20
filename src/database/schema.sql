@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS tags (
     UNIQUE KEY unique_guild_tag_name (guild_id, name),
     FOREIGN KEY (guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
 );
+
 -- Create ticket_panels table
 CREATE TABLE IF NOT EXISTS ticket_panels (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -88,3 +89,39 @@ CREATE TABLE IF NOT EXISTS ticket_panels (
     UNIQUE KEY unique_panel_message (guild_id, channel_id, message_id),
     FOREIGN KEY (guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
 );
+
+-- Create ticket_categories table
+CREATE TABLE IF NOT EXISTS ticket_categories (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    guild_id VARCHAR(255) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    category_id VARCHAR(255),
+    support_role_id VARCHAR(255),
+    welcome_message TEXT,
+    ticket_name_format VARCHAR(100) DEFAULT 'ticket-{number}',
+    feedback_enabled BOOLEAN DEFAULT FALSE,
+    color VARCHAR(10) DEFAULT '#3498DB',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_guild_category_name (guild_id, name),
+    FOREIGN KEY (guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
+);
+
+-- Create ticket_feedback table
+CREATE TABLE IF NOT EXISTS ticket_feedback (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    guild_id VARCHAR(255) NOT NULL,
+    ticket_id INT NOT NULL,
+    user_id VARCHAR(255) NOT NULL,
+    rating INT NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    comments TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE,
+    FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE
+);
+
+-- Modify ticket_panels table to include category_id
+ALTER TABLE ticket_panels
+ADD COLUMN category_id INT,
+ADD FOREIGN KEY (category_id) REFERENCES ticket_categories(id) ON DELETE SET NULL;
